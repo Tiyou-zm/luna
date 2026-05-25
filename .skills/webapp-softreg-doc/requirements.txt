@@ -1,0 +1,3 @@
+python-docx
+pywin32
+pyyaml

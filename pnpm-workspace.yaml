@@ -1,0 +1,11 @@
+onlyBuiltDependencies:
+  - "@ast-grep/cli"
+  - weapp-tailwindcss
+  - "@tarojs/binding"
+  - "@tarojs/cli"
+lockfileIncludeTarballUrl: false
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - miaoda-sc-plugin
+  - miaoda-taro-utils
+  - miaoda-taro-plugin-html

@@ -1,0 +1,16 @@
+{
+  "plugins": [],
+  "categories": {
+    "correctness": "off"
+  },
+  "jsPlugins": [
+    "./.rules/taro-app-config-validator.ts",
+    "./.rules/check-image-import-plugin.ts",
+    "./.rules/check-video-style-plugin.ts"
+  ],
+  "rules": {
+    "taro-app-config-validator/taro-app-config-validator": "error",
+    "check-image-exists/no-missing-image": "error",
+    "check-video-style/no-video-inline-style": "error"
+  }
+}

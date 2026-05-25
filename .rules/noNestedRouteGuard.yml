@@ -1,0 +1,24 @@
+id: no-nested-route-guard-in-auth-provider
+language: Tsx
+severity: error
+files:
+  - src/**/*.tsx
+message: "AuthProvider should not wrap RouteGuard component"
+
+rule:
+  kind: jsx_element
+  all:
+    # Match AuthProvider as opening tag
+    - has:
+        kind: jsx_opening_element
+        has:
+          kind: identifier
+          regex: ^AuthProvider$
+    # Match RouteGuard as a child element
+    - has:
+        kind: jsx_element
+        has:
+          kind: jsx_opening_element
+          has:
+            kind: identifier
+            regex: ^RouteGuard$
