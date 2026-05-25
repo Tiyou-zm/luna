@@ -377,6 +377,11 @@ interface AttachmentMeta {
 }
 
 // ── 调用 luna_hermes_chat（内部 Edge Function）────────────────────
+interface HermesCallResult {
+  reply: string
+  formatted_result: Record<string, Record<string, unknown>> | null
+}
+
 async function callHermes(params: {
   systemPrompt: string
   userMessage: string
@@ -390,7 +395,7 @@ async function callHermes(params: {
   authHeader: string
   supabaseUrl: string
   serviceRoleKey: string
-}): Promise<string> {
+}): Promise<HermesCallResult> {
   const url = `${params.supabaseUrl}/functions/v1/luna_hermes_chat`
   const res = await fetch(url, {
     method: 'POST',
@@ -415,7 +420,11 @@ async function callHermes(params: {
     throw new Error(`luna_hermes_chat HTTP ${res.status}: ${errText}`)
   }
   const data = await res.json()
-  return data.reply || ''
+  return {
+    reply: data.reply || '',
+    // 新格式经 MiniMax 整理后的结果；旧格式时为 null
+    formatted_result: data.formatted_result ?? null,
+  }
 }
 
 // ── 主处理逻辑 ────────────────────────────────────────────────────
@@ -548,7 +557,7 @@ Deno.serve(async (req: Request) => {
       console.log('[luna_route] upstream = hermes')
       let reply = ''
       try {
-        reply = await callHermes({
+        const hermesResult = await callHermes({
           systemPrompt: LUNA_SYSTEM_PROMPT,
           userMessage,
           history,
@@ -562,6 +571,7 @@ Deno.serve(async (req: Request) => {
           supabaseUrl,
           serviceRoleKey,
         })
+        reply = hermesResult.reply
       } catch (e) {
         console.error('[guard] callHermes chat failed:', e)
         reply = '抱歉，我暂时无法回复，请稍后再试。'
@@ -582,8 +592,9 @@ Deno.serve(async (req: Request) => {
 
     const prompt = buildPackagePrompt(guardTaskType, body)
     let rawReply = ''
+    let hermesFormatted: Record<string, Record<string, unknown>> | null = null
     try {
-      rawReply = await callHermes({
+      const hermesResult = await callHermes({
         systemPrompt: LUNA_SYSTEM_PROMPT,
         userMessage: prompt,
         history: [],
@@ -597,12 +608,21 @@ Deno.serve(async (req: Request) => {
         supabaseUrl,
         serviceRoleKey,
       })
+      rawReply = hermesResult.reply
+      hermesFormatted = hermesResult.formatted_result
     } catch (e) {
       console.error('[guard] callHermes package failed:', e)
     }
 
-    const parsed = rawReply ? extractJSON(rawReply) : null
-    const result = repairPlatformResult(parsed || {}, platforms)
+    // 优先使用 MiniMax 整理后的结果（新格式），否则走旧格式解析
+    let result: Record<string, Record<string, unknown>>
+    if (hermesFormatted && Object.keys(hermesFormatted).length > 0) {
+      console.log('[guard] using MiniMax formatted_result, platforms:', Object.keys(hermesFormatted))
+      result = repairPlatformResult(hermesFormatted, platforms)
+    } else {
+      const parsed = rawReply ? extractJSON(rawReply) : null
+      result = repairPlatformResult(parsed || {}, platforms)
+    }
 
     // 保存到 materials 表
     let materialId: string | null = null
