@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
 
     // 调用 Hermes Agent
     const HERMES_BASE_URL = Deno.env.get('HERMES_BASE_URL') || 'http://152.136.47.2:8642'
-    const HERMES_API_KEY = Deno.env.get('HERMES_API_KEY') || 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+    const HERMES_API_KEY = Deno.env.get('HERMES_API_KEY') || ''
     const HERMES_MODEL = Deno.env.get('HERMES_MODEL') || 'hermes-agent'
 
     let reply = ''

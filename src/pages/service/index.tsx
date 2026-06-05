@@ -2,14 +2,14 @@
 import {useState, useCallback, useEffect, useMemo} from 'react'
 import Taro, {useDidShow, useShareAppMessage, useShareTimeline} from '@tarojs/taro'
 import {Image, ScrollView} from '@tarojs/components'
-import {supabase} from '@/client/supabase'
+import {callCloudFunction} from '@/client/cloudbase'
+import {LunaAvatar} from '@/components/LunaAvatar'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
 import {getCsMessages} from '@/db/api'
 import {selectMediaFiles, uploadToSupabase} from '@/utils/upload'
+import {getMiniWindowHeight} from '@/utils/system'
 import type {CsMessage} from '@/db/types'
-
-const LUNA_AVATAR = 'https://miaoda-conversation-file.cdn.bcebos.com/user-b9kbo3bmsirk/conv-b9plzy10uj28/20260428/file-b9qfv1zaaups.png'
 
 const WELCOME_MSG: CsMessage = {
   id: 'welcome',
@@ -60,7 +60,7 @@ function ServicePage() {
         Taro.showToast({title: '图片上传失败，请重试', icon: 'none'})
         return
       }
-      const publicUrl = supabase.storage.from('cs-images').getPublicUrl(result.data.path).data.publicUrl
+      const publicUrl = result.data.publicUrl || result.data.fileID
       const tempPath = (file as {tempFilePath?: string}).tempFilePath || ''
       setPendingImage({tempPath, publicUrl})
     } catch {
@@ -94,16 +94,7 @@ function ServicePage() {
     setMessages((prev) => [...prev, tmpMsg])
 
     try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-      const {data, error} = await supabase.functions.invoke('customer_service', {
-        body: {message: text, imageUrl: imageUrl || undefined},
-        headers: token ? {Authorization: `Bearer ${token}`} : {}
-      })
-      if (error) {
-        const errMsg = await error?.context?.text?.()
-        throw new Error(errMsg || error.message)
-      }
+      const data = await callCloudFunction<any>('customerService', {message: text, imageUrl: imageUrl || undefined})
       setMessages((prev) => {
         const filtered = prev.filter((m) => m.id !== tmpId)
         const userSaved = data?.userMessage ?? {...tmpMsg, id: `user_${Date.now()}`}
@@ -125,9 +116,11 @@ function ServicePage() {
 
   const canSend = (inputText.trim() || !!pendingImage) && !sending && !uploading
 
-  const containerHeight = Taro.getEnv() === Taro.ENV_TYPE.WEB
+  const isWeb = Taro.getEnv() === Taro.ENV_TYPE.WEB
+  const windowHeight = isWeb ? 812 : getMiniWindowHeight()
+  const containerHeight = isWeb
     ? 'calc(100vh - 50px)'
-    : `${Taro.getSystemInfoSync().windowHeight}px`
+    : `${windowHeight}px`
 
   return (
     <div style={{height: containerHeight, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'hsl(252 30% 97%)'}}>
@@ -142,7 +135,7 @@ function ServicePage() {
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="relative flex-shrink-0">
             <div className="rounded-full overflow-hidden border-2 border-white/40" style={{width: '44px', height: '44px', background: 'hsl(252 60% 80%)'}}>
-              <Image src={LUNA_AVATAR} mode="aspectFill" style={{width: '44px', height: '44px'}} />
+              <LunaAvatar size={44} />
             </div>
             <div className="absolute bottom-0 right-0 rounded-full border-2 border-white" style={{width: '10px', height: '10px', background: '#22c55e'}} />
           </div>
@@ -156,8 +149,8 @@ function ServicePage() {
       </div>
 
       {/* ===快捷回复标签（横向滚动）=== */}
-      <ScrollView scrollX className="flex-shrink-0" style={{whiteSpace: 'nowrap', paddingLeft: '16px', paddingRight: '16px', marginBottom: '8px'}}>
-        <div style={{display: 'inline-flex', gap: '8px', paddingTop: '2px', paddingBottom: '2px'}}>
+      <ScrollView scrollX className="flex-shrink-0" style={{whiteSpace: 'nowrap', marginBottom: '8px'}}>
+        <div style={{display: 'inline-flex', gap: '8px', padding: '2px 16px'}}>
           {QUICK_REPLIES.map((q) => (
             <button
               key={q}
@@ -176,7 +169,7 @@ function ServicePage() {
       <div className="flex-shrink-0 flex gap-2 px-4 mb-2">
         {[
           {icon: 'i-mdi-crown-outline', label: '查看套餐', url: '/pages/pricing/index'},
-          {icon: 'i-mdi-apps', label: '功能介绍', url: '/pages/features/index', isTab: true},
+          {icon: 'i-mdi-folder-text-outline', label: '素材库', url: '/pages/materials/index', isTab: true},
         ].map((item) => (
           <div
             key={item.label}
@@ -212,7 +205,7 @@ function ServicePage() {
                       className="rounded-full overflow-hidden flex-shrink-0 border border-white"
                       style={{width: '38px', height: '38px', background: 'linear-gradient(135deg, hsl(243 67% 57%), hsl(263 60% 64%))', boxShadow: '0 2px 8px hsl(243 67% 57% / 0.3)'}}
                     >
-                      <Image src={LUNA_AVATAR} mode="aspectFill" style={{width: '38px', height: '38px'}} />
+                      <LunaAvatar size={38} />
                     </div>
                   ) : (
                     <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{width: '38px', height: '38px', background: 'hsl(252 40% 88%)'}}>
@@ -259,7 +252,7 @@ function ServicePage() {
                 className="rounded-full overflow-hidden flex-shrink-0 border border-white"
                 style={{width: '38px', height: '38px', background: 'linear-gradient(135deg, hsl(243 67% 57%), hsl(263 60% 64%))', boxShadow: '0 2px 8px hsl(243 67% 57% / 0.3)'}}
               >
-                <Image src={LUNA_AVATAR} mode="aspectFill" style={{width: '38px', height: '38px'}} />
+                <LunaAvatar size={38} />
               </div>
               <div className="px-4 py-4" style={{background: 'white', borderRadius: '4px 16px 16px 16px', boxShadow: '0 2px 8px hsl(252 20% 80% / 0.25)', border: '1px solid hsl(252 20% 91%)'}}>
                 <div className="flex items-center gap-1.5">

@@ -25,6 +25,12 @@ Deno.serve(async (req) => {
 
     const APP_ID = Deno.env.get('WECHAT_MINIPROGRAM_LOGIN_APP_ID')
     const APP_SECRET = Deno.env.get('WECHAT_MINIPROGRAM_LOGIN_APP_SECRET')
+    if (!APP_ID || !APP_SECRET) {
+      return new Response(JSON.stringify({ message: '微信登录配置未完成' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     const wxRes = await fetch(
       `https://api.weixin.qq.com/sns/jscode2session?appid=${APP_ID}&secret=${APP_SECRET}&js_code=${code}&grant_type=authorization_code`
@@ -41,7 +47,8 @@ Deno.serve(async (req) => {
     const { openid } = wxData
     const email = `${openid}@wechat.login`
 
-    const { data: magicLinkData, error: magicLinkError } =
+    let otpType = 'email'
+    let { data: magicLinkData, error: magicLinkError } =
       await supabaseAdmin.auth.admin.generateLink({
         type: 'magiclink',
         email,
@@ -49,6 +56,20 @@ Deno.serve(async (req) => {
           data: { from: 'wechat', openid },
         },
       })
+
+    if (magicLinkError) {
+      const signupResult = await supabaseAdmin.auth.admin.generateLink({
+        type: 'signup',
+        email,
+        password: crypto.randomUUID(),
+        options: {
+          data: { from: 'wechat', openid, username: `wx_${String(openid).slice(0, 24)}` },
+        },
+      })
+      magicLinkData = signupResult.data
+      magicLinkError = signupResult.error
+      otpType = 'signup'
+    }
 
     if (magicLinkError) {
       return new Response(JSON.stringify({ message: magicLinkError.message }), {
@@ -65,7 +86,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    return new Response(JSON.stringify({ token: hashedToken, openid }), {
+    return new Response(JSON.stringify({ token: hashedToken, type: otpType, openid }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

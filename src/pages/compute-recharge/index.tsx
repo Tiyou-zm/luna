@@ -2,7 +2,8 @@ import {useState, useEffect, useCallback} from 'react'
 import Taro from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
-import {supabase} from '@/client/supabase'
+import {callCloudFunction, callDbApi} from '@/client/cloudbase'
+import {withTimeout} from '@/utils/async'
 
 interface ModelInfo {
   id: string
@@ -40,7 +41,11 @@ function ComputeRechargePage() {
   const loadPricing = useCallback(async () => {
     setPricingLoading(true)
     try {
-      const {data, error} = await supabase.functions.invoke('ark_model_pricing')
+      const {data, error} = await withTimeout(
+        callCloudFunction<PricingData>('arkModelPricing').then((data) => ({data, error: null})),
+        10000,
+        'pricing timeout'
+      )
       if (!error && data) {
         setPricingData(data as PricingData)
       }
@@ -78,35 +83,22 @@ function ComputeRechargePage() {
       const planLabel = selectedPlan ? `¥${finalAmount}（赠${selectedPlan.bonus}）` : `¥${finalAmount}`
 
       // 2. 获取 openid（优先用 profile 缓存，否则重新 login 获取）
-      let openid = profile?.openid as string | null
-      if (!openid) {
-        try {
-          const loginResult = await Taro.login()
-          const {data: openidData} = await supabase.functions.invoke('get_wechat_openid', {
-            body: {code: loginResult.code}
-          })
-          openid = openidData?.openid || null
-        } catch {
-          openid = null
-        }
-      }
+      const openid = profile?.openid as string | null
       if (!openid) {
         Taro.showToast({title: '获取用户信息失败，请重新登录', icon: 'none'})
         setPaying(false)
         return
       }
 
-      const {data, error} = await supabase.functions.invoke('create_wechat_payment', {
-        body: {
-          openid,
-          planName: planLabel,
-          amount: finalAmount,
-          type: 'compute',
-          computeCredits: credits
-        }
+      const data = await callCloudFunction<any>('createWechatPayment', {
+        openid,
+        planName: planLabel,
+        amount: finalAmount,
+        type: 'compute',
+        computeCredits: credits,
       })
 
-      if (error || !data?.success) {
+      if (!data?.success) {
         const msg = data?.error || '创建订单失败，请重试'
         Taro.showToast({title: msg, icon: 'none', duration: 3000})
         setPaying(false)
@@ -126,15 +118,14 @@ function ComputeRechargePage() {
 
       // 4. 轮询 compute_recharges 确认支付结果（最多60秒）
       Taro.showToast({title: '支付确认中...', icon: 'loading', duration: 10000})
+      await callCloudFunction('createWechatPayment', {action: 'confirm', orderNo}).catch((error) => {
+        console.warn('confirm compute payment failed:', error)
+      })
       let attempts = 0
       const maxAttempts = 30
       const poll = async () => {
         attempts++
-        const {data: rechargeRow} = await supabase
-          .from('compute_recharges')
-          .select('status, compute_credits')
-          .eq('order_no', orderNo)
-          .maybeSingle()
+        const rechargeRow = await callDbApi<any>('getComputeRechargeStatus', {orderNo})
 
         if (rechargeRow?.status === 'paid') {
           Taro.hideToast()

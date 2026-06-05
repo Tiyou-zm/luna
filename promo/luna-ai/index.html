@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Luna AI | 内容生产的随身中枢</title>
+    <meta
+      name="description"
+      content="Luna AI 是面向自媒体创作者和品牌团队的 AI 内容工作站，用素材、方向和热点生成多平台内容包。"
+    />
+    <style>
+      :root {
+        --ink: #101312;
+        --paper: #f5efe4;
+        --porcelain: #fffaf1;
+        --green: #17382f;
+        --green-soft: #dce9df;
+        --violet: #6f55ef;
+        --gold: #d8ad52;
+        --ember: #d8664d;
+        --line: rgba(16, 19, 18, 0.12);
+        --muted: rgba(16, 19, 18, 0.66);
+        --shadow: 0 34px 100px rgba(12, 16, 18, 0.3);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .nav {
+        position: fixed;
+        z-index: 30;
+        inset: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px clamp(20px, 5vw, 76px);
+        color: #fff;
+        mix-blend-mode: difference;
+      }
+
+      .brand {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 24px;
+        font-size: 13px;
+      }
+
+      .hero {
+        min-height: 94vh;
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        align-items: end;
+        padding: 122px clamp(22px, 7vw, 100px) 74px;
+        color: #fff;
+        background:
+          radial-gradient(circle at 68% 48%, rgba(216, 173, 82, 0.18), transparent 28%),
+          linear-gradient(90deg, rgba(7, 10, 9, 0.96), rgba(7, 10, 9, 0.74) 50%, rgba(7, 10, 9, 0.24)),
+          url("assets/chat-phone.png") right 10% center / auto 113% no-repeat,
+          #0d1110;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        height: 24vh;
+        background: linear-gradient(0deg, var(--paper), rgba(245, 239, 228, 0));
+      }
+
+      .hero-copy {
+        position: relative;
+        z-index: 2;
+        width: min(850px, 100%);
+      }
+
+      .label {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .label::before {
+        content: "";
+        width: 44px;
+        height: 1px;
+        background: var(--gold);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", "Songti SC", serif;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: clamp(56px, 8vw, 122px);
+        line-height: 0.95;
+      }
+
+      .hero-text {
+        max-width: 680px;
+        margin: 28px 0 34px;
+        color: rgba(255, 255, 255, 0.84);
+        font-size: clamp(17px, 1.6vw, 22px);
+        line-height: 1.86;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+
+      .button {
+        min-height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 22px;
+        border: 1px solid rgba(255, 255, 255, 0.36);
+        border-radius: 6px;
+        font-size: 14px;
+        transition:
+          transform 180ms ease,
+          background 180ms ease,
+          border-color 180ms ease;
+      }
+
+      .button.primary {
+        background: #fff;
+        color: var(--ink);
+        border-color: #fff;
+      }
+
+      .button:hover {
+        transform: translateY(-2px);
+        border-color: var(--gold);
+      }
+
+      main {
+        position: relative;
+        z-index: 5;
+      }
+
+      .section {
+        padding: 90px clamp(22px, 7vw, 100px);
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: clamp(34px, 7vw, 112px);
+        align-items: end;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: var(--violet);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      h2 {
+        font-size: clamp(34px, 4.5vw, 64px);
+        line-height: 1.1;
+      }
+
+      .lead {
+        margin: 0;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.95;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 46px;
+        background: var(--line);
+        border: 1px solid var(--line);
+      }
+
+      .metric {
+        min-height: 150px;
+        padding: 26px;
+        background: rgba(255, 250, 241, 0.76);
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 32px;
+        color: var(--gold);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 42px;
+        line-height: 1;
+      }
+
+      .metric span {
+        color: rgba(16, 19, 18, 0.74);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .modes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .mode {
+        min-height: 310px;
+        padding: 32px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--porcelain);
+      }
+
+      .mode:nth-child(2) {
+        background: var(--green-soft);
+      }
+
+      .mode-num {
+        color: var(--gold);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 46px;
+      }
+
+      .mode h3 {
+        margin: 70px 0 18px;
+        font-size: 31px;
+      }
+
+      .mode p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.9;
+      }
+
+      .dark {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: clamp(30px, 6vw, 90px);
+        align-items: center;
+        background: #101514;
+        color: #fff;
+      }
+
+      .phones {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        align-items: center;
+      }
+
+      .phone {
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        background: #050606;
+        box-shadow: var(--shadow);
+      }
+
+      .phone:nth-child(2) {
+        transform: translateY(36px);
+      }
+
+      .phone:nth-child(3) {
+        transform: translateY(-24px);
+      }
+
+      .dark .eyebrow {
+        color: var(--gold);
+      }
+
+      .dark .lead {
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .platforms {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border-top: 1px solid var(--line);
+        border-left: 1px solid var(--line);
+      }
+
+      .platform {
+        min-height: 240px;
+        padding: 28px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.42);
+      }
+
+      .platform strong {
+        display: block;
+        margin-bottom: 64px;
+        color: var(--ember);
+        font-size: 13px;
+      }
+
+      .platform h3 {
+        margin-bottom: 14px;
+        font-size: 25px;
+      }
+
+      .platform p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.85;
+      }
+
+      .asset-band {
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: clamp(30px, 7vw, 104px);
+        align-items: center;
+        background:
+          linear-gradient(90deg, rgba(245, 239, 228, 0.99), rgba(245, 239, 228, 0.73)),
+          url("assets/materials-phone.png") left 9% center / auto 92% no-repeat,
+          #eadfcd;
+      }
+
+      .asset-card {
+        padding: 36px;
+        border-radius: 8px;
+        background: rgba(255, 250, 241, 0.9);
+        border: 1px solid var(--line);
+        box-shadow: 0 18px 60px rgba(16, 19, 18, 0.08);
+      }
+
+      .asset-card p {
+        margin: 18px 0 0;
+      }
+
+      .quote {
+        padding: 110px clamp(22px, 9vw, 146px);
+        color: #fff;
+        background:
+          linear-gradient(90deg, rgba(16, 21, 20, 0.92), rgba(16, 21, 20, 0.72)),
+          url("assets/package-phone.png") right 18% center / auto 116% no-repeat,
+          var(--green);
+      }
+
+      .quote h2 {
+        max-width: 980px;
+      }
+
+      .closing {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: clamp(30px, 7vw, 104px);
+        align-items: center;
+      }
+
+      .closing-panel {
+        padding: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 18px 54px rgba(16, 19, 18, 0.08);
+      }
+
+      .closing-panel p {
+        margin: 0;
+      }
+
+      footer {
+        padding: 28px clamp(22px, 7vw, 100px);
+        border-top: 1px solid var(--line);
+        color: rgba(16, 19, 18, 0.52);
+        font-size: 13px;
+      }
+
+      @media (max-width: 900px) {
+        .nav-links {
+          display: none;
+        }
+
+        .hero {
+          min-height: 90vh;
+          background:
+            linear-gradient(180deg, rgba(7, 10, 9, 0.91), rgba(7, 10, 9, 0.68) 56%, rgba(7, 10, 9, 0.25)),
+            url("assets/chat-phone.png") center bottom / auto 76% no-repeat,
+            #0d1110;
+        }
+
+        .intro,
+        .dark,
+        .asset-band,
+        .closing {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics,
+        .modes,
+        .platforms {
+          grid-template-columns: 1fr;
+        }
+
+        .phones {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .phone:nth-child(2),
+        .phone:nth-child(3) {
+          transform: none;
+        }
+
+        .asset-band {
+          background:
+            linear-gradient(rgba(245, 239, 228, 0.94), rgba(245, 239, 228, 0.94)),
+            url("assets/materials-phone.png") center top / auto 72% no-repeat,
+            #eadfcd;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="brand" href="#">Luna AI</a>
+      <nav class="nav-links" aria-label="页面导航">
+        <a href="#modes">创作方式</a>
+        <a href="#package">内容包</a>
+        <a href="#library">素材库</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="label">CREATOR INTELLIGENCE WORKSPACE</div>
+        <h1>Luna AI</h1>
+        <p class="hero-text">
+          一座随身的内容生产中枢。给它一份素材，或一个方向，Luna 会把灵感、热点、图片和文案整理成可发布、可管理、可复用的多平台内容资产。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#modes">查看创作路径</a>
+          <a class="button" href="#package">了解内容包</a>
+        </div>
+      </div>
+    </section>
+
+    <main>
+      <section class="section" id="modes">
+        <div class="intro">
+          <div>
+            <p class="eyebrow">FROM BRIEF TO PACKAGE</p>
+            <h2>把散落的想法，推进成一套完整内容方案。</h2>
+          </div>
+          <p class="lead">
+            Luna AI 面向自媒体创作者、品牌主理人、探店团队、知识博主和私域运营者。它把素材理解、热点判断、平台适配和资产沉淀放进同一个小程序工作台，让内容生产更接近一条稳定流水线。
+          </p>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <strong>2</strong>
+            <span>两种入口：已有素材，或只有方向。</span>
+          </div>
+          <div class="metric">
+            <strong>4</strong>
+            <span>覆盖小红书、抖音、朋友圈、公众号。</span>
+          </div>
+          <div class="metric">
+            <strong>1</strong>
+            <span>一个素材库沉淀上传素材和生成结果。</span>
+          </div>
+          <div class="metric">
+            <strong>∞</strong>
+            <span>持续复用、二次生成、迭代选题。</span>
+          </div>
+        </div>
+
+        <div class="modes">
+          <article class="mode">
+            <div class="mode-num">01</div>
+            <h3>上传素材，生成内容包</h3>
+            <p>
+              上传产品图、门店照片、视频截图、活动信息或旧文案，Luna 帮你提炼卖点，生成标题、正文、脚本、话题标签和文章结构。
+            </p>
+          </article>
+          <article class="mode">
+            <div class="mode-num">02</div>
+            <h3>给出方向，启动热点雷达</h3>
+            <p>
+              只输入行业、定位、目标人群和内容方向，Hermes 先进行信息收集和热点预测，再把结果转化为可继续创作的素材包。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section dark" id="package">
+        <div class="phones" aria-label="Luna AI 产品界面">
+          <figure class="phone">
+            <img src="assets/package-phone.png" alt="Luna AI 新建素材包界面" />
+          </figure>
+          <figure class="phone">
+            <img src="assets/materials-phone.png" alt="Luna AI 素材库界面" />
+          </figure>
+          <figure class="phone">
+            <img src="assets/profile-phone.png" alt="Luna AI 用户中心界面" />
+          </figure>
+        </div>
+        <div>
+          <p class="eyebrow">MATERIAL PACKAGE</p>
+          <h2>不是一句 AI 回复，而是一组可交付内容资产。</h2>
+          <p class="lead">
+            Luna 的目标不是替你“写一段”，而是把一次创作拆成可执行的发布组合：封面标题、正文、标签、短视频脚本、朋友圈表达、公众号大纲和图片素材，让团队更快进入发布与复盘。
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="intro">
+          <div>
+            <p class="eyebrow">PLATFORM LANGUAGE</p>
+            <h2>同一个卖点，匹配不同平台的表达法则。</h2>
+          </div>
+          <p class="lead">
+            小红书需要种草感，抖音需要开场钩子，朋友圈需要真实体验，公众号需要完整结构。Luna 会按平台语气重新组织内容，让每一份素材找到更合适的出口。
+          </p>
+        </div>
+
+        <div class="platforms" style="margin-top: 46px;">
+          <article class="platform">
+            <strong>XIAOHONGSHU</strong>
+            <h3>小红书</h3>
+            <p>生成封面标题、正文、场景角度和话题标签，适合种草、测评和清单内容。</p>
+          </article>
+          <article class="platform">
+            <strong>DOUYIN</strong>
+            <h3>抖音</h3>
+            <p>输出 30 秒脚本、开场钩子、分镜段落和节奏提示，降低短视频起稿成本。</p>
+          </article>
+          <article class="platform">
+            <strong>MOMENTS</strong>
+            <h3>朋友圈</h3>
+            <p>把产品卖点改写成更自然的体验表达，适合私域转化和活动预热。</p>
+          </article>
+          <article class="platform">
+            <strong>WECHAT PUBLIC</strong>
+            <h3>公众号</h3>
+            <p>生成文章标题、开头 Hook、痛点共鸣、功能拆解和结尾转化结构。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section asset-band" id="library">
+        <div></div>
+        <div class="asset-card">
+          <p class="eyebrow">ASSET LIBRARY</p>
+          <h2>内容不是一次性消耗品，而是越用越厚的品牌资产。</h2>
+          <p class="lead">
+            用户上传的素材、Hermes 回传的素材包和最终生成内容都会回到素材库。后续可以按项目、平台、类型继续管理、复用和二次生成，让每次创作都为下一次积累弹药。
+          </p>
+        </div>
+      </section>
+
+      <section class="quote">
+        <p class="eyebrow">A LITTLE MORE AMBITIOUS</p>
+        <h2>让小团队也拥有一套接近内容中台的能力：能收集、能判断、能生成，也能把结果沉淀成资产。</h2>
+      </section>
+
+      <section class="section closing">
+        <div>
+          <p class="eyebrow">FOR THE NEXT BUILD</p>
+          <h2>当 COS、Hermes 和素材库闭环接上，Luna 会成为创作者每天打开的工作入口。</h2>
+        </div>
+        <div class="closing-panel">
+          <p class="lead">
+            它不是另一个聊天窗口，而是一个面向内容结果的工作站：用户上传素材，Hermes 理解方向，Luna 生成内容包，素材库负责沉淀与复用。一个轻量小程序，承载完整内容生产链路。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>Luna AI | 内容生产的随身中枢</footer>
+  </body>
+</html>

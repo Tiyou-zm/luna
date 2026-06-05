@@ -2,10 +2,10 @@ import {useState} from 'react'
 import Taro from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
-import {supabase} from '@/client/supabase'
+import {callCloudFunction} from '@/client/cloudbase'
 
 function AccountSecurityPage() {
-  const {signOut, profile} = useAuth()
+  const {user, signOut, profile} = useAuth()
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -26,21 +26,21 @@ function AccountSecurityPage() {
     }
     setLoading(true)
     try {
-      const {error} = await supabase.auth.updateUser({password: newPassword})
-      if (error) {
-        Taro.showToast({title: error.message || '修改失败', icon: 'none'})
-      } else {
-        Taro.showToast({title: '密码修改成功', icon: 'success'})
-        setShowChangePassword(false)
-        setNewPassword('')
-        setConfirmPassword('')
-      }
+      await callCloudFunction('accountAuth', {action: 'changePassword', password: newPassword})
+      Taro.showToast({title: '密码修改成功', icon: 'success'})
+      setShowChangePassword(false)
+      setNewPassword('')
+      setConfirmPassword('')
     } finally {
       setLoading(false)
     }
   }
 
   const handleSignOut = async () => {
+    if (!user) {
+      Taro.navigateTo({url: '/pages/login/index'})
+      return
+    }
     Taro.showModal({
       title: '退出登录',
       content: '确认退出当前账号？',
@@ -55,6 +55,27 @@ function AccountSecurityPage() {
 
   return (
     <div className="min-h-screen bg-background px-4 pt-4 pb-8">
+      {!user ? (
+        <div className="bg-card p-6 shadow-card border border-border rounded-2xl">
+          <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mb-4">
+            <div className="i-mdi-account-lock-outline text-white" style={{fontSize: '28px'}} />
+          </div>
+          <p className="text-3xl font-bold text-foreground mb-2">账号安全</p>
+          <p className="text-xl text-muted-foreground leading-relaxed mb-5">
+            登录后可以管理账号资料、修改密码和查看安全信息。
+          </p>
+          <button
+            type="button"
+            className="w-full py-1 bg-gradient-primary shadow-primary flex items-center justify-center leading-none"
+            onClick={() => Taro.navigateTo({url: '/pages/login/index'})}
+          >
+            <div className="py-3">
+              <span className="text-xl font-bold text-white">登录 / 注册</span>
+            </div>
+          </button>
+        </div>
+      ) : (
+        <>
       {/* 账号信息 */}
       <div className="bg-card p-5 shadow-card border border-border rounded-2xl mb-4">
         <p className="text-xl font-bold text-muted-foreground mb-3">当前账号</p>
@@ -150,6 +171,8 @@ function AccountSecurityPage() {
           <span className="text-2xl font-medium text-destructive">退出登录</span>
         </div>
       </button>
+        </>
+      )}
     </div>
   )
 }

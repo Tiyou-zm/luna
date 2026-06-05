@@ -1,3 +1,0 @@
-ALTER TABLE profiles
-  ADD COLUMN IF NOT EXISTS cos_space_initialized BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS cos_initialized_at TIMESTAMPTZ;

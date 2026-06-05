@@ -22,7 +22,7 @@ const CORS = {
 
 const DEFAULT_HERMES_BASE_URL = 'http://152.136.47.2:8642'
 const DEFAULT_HERMES_MODEL = 'hermes-agent'
-const DEFAULT_HERMES_API_KEY = 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+const DEFAULT_HERMES_API_KEY = ''
 
 // ── 类型定义 ──────────────────────────────────────────────────────
 interface AttachmentMeta {

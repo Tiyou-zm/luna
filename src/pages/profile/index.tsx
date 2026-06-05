@@ -63,9 +63,7 @@ function ProfilePage() {
         Taro.showToast({title: '上传失败，请重试', icon: 'none'})
         return
       }
-      const {data: {publicUrl}} = await import('@/client/supabase').then(m =>
-        Promise.resolve(m.supabase.storage.from('avatars').getPublicUrl(result.data!.path))
-      )
+      const publicUrl = result.data.publicUrl || result.data.fileID
       const ok = await updateProfile(user.id, {avatar_url: publicUrl})
       if (ok) {
         await refreshProfile()
@@ -81,6 +79,10 @@ function ProfilePage() {
   }
 
   const handleSignOut = async () => {
+    if (!user) {
+      Taro.navigateTo({url: '/pages/login/index'})
+      return
+    }
     Taro.showModal({
       title: '退出登录',
       content: '确认退出当前账号？',
@@ -319,14 +321,14 @@ function ProfilePage() {
       {/* 设置列表 */}
       <div className="mx-4 mt-4 bg-card rounded-2xl shadow-card border border-border overflow-hidden">
         {[
-          {icon: 'i-mdi-lock-outline', label: '账号安全', sub: '修改密码、退出登录', url: '/pages/account-security/index'},
+          {icon: 'i-mdi-lock-outline', label: '账号安全', sub: user ? '修改密码、退出登录' : '登录后管理账号安全', url: '/pages/account-security/index'},
           {icon: 'i-mdi-cog-outline', label: '系统设置', sub: '通知、缓存、个性化', url: '/pages/settings/index'},
           {icon: 'i-mdi-information-outline', label: '关于我们', sub: '服务协议、版本信息', url: '/pages/about/index'}
         ].map((item, idx, arr) => (
           <div
             key={item.label}
             className={`flex items-center gap-4 px-5 py-4 ${idx < arr.length - 1 ? 'border-b border-border' : ''}`}
-            onClick={() => Taro.navigateTo({url: item.url})}
+            onClick={() => Taro.navigateTo({url: !user && item.url === '/pages/account-security/index' ? '/pages/login/index' : item.url})}
           >
             <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center flex-shrink-0">
               <div className={`${item.icon} text-primary`} style={{fontSize: '22px'}} />
@@ -367,7 +369,7 @@ function ProfilePage() {
           onClick={handleSignOut}
         >
           <div className="py-4">
-            <span className="text-2xl font-medium text-destructive">退出登录</span>
+            <span className="text-2xl font-medium text-destructive">{user ? '退出登录' : '登录 / 注册'}</span>
           </div>
         </button>
       </div>

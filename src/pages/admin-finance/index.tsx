@@ -3,7 +3,8 @@ import {useState, useCallback, useEffect, useMemo} from 'react'
 import Taro, {useDidShow} from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
-import {supabase} from '@/client/supabase'
+import {callCloudFunction} from '@/client/cloudbase'
+import {withTimeout} from '@/utils/async'
 import {
   getFinanceReports,
   getLatestFinanceReport,
@@ -29,7 +30,7 @@ function fmtMoneyShort(val: number): string {
 }
 
 function AdminFinancePage() {
-  const {user, profile} = useAuth()
+  const {user, profile, loading: authLoading} = useAuth()
   const [latestReport, setLatestReport] = useState<FinanceReport | null>(null)
   const [latestOrder, setLatestOrder] = useState<TransferOrder | null>(null)
   const [reports, setReports] = useState<FinanceReport[]>([])
@@ -53,15 +54,19 @@ function AdminFinancePage() {
   const isAdmin = useMemo(() => profile?.is_admin === true, [profile])
 
   const loadData = useCallback(async () => {
-    if (!isAdmin) return
+    if (authLoading) return
+    if (!isAdmin) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const [latest, allReports, recharge, usage] = await Promise.all([
+      const [latest, allReports, recharge, usage] = await withTimeout(Promise.all([
         getLatestFinanceReport(),
         getFinanceReports(30),
         getRechargeSummary(),
         getUsageSummaryByDay(7)
-      ])
+      ]), 10000, 'finance data timeout')
       setLatestReport(latest)
       setReports(allReports)
       setRechargeSummary(recharge)
@@ -76,7 +81,7 @@ function AdminFinancePage() {
     } finally {
       setLoading(false)
     }
-  }, [isAdmin])
+  }, [authLoading, isAdmin])
 
   useEffect(() => {loadData()}, [loadData])
   useDidShow(() => {loadData()})
@@ -85,15 +90,7 @@ function AdminFinancePage() {
   const handleTriggerCalc = async () => {
     setCalcLoading(true)
     try {
-      const {error} = await supabase.functions.invoke('finance-daily-calc', {
-        method: 'POST',
-        body: {}
-      })
-      if (error) {
-        const msg = await error?.context?.text?.()
-        Taro.showToast({title: msg || '计算失败', icon: 'none'})
-        return
-      }
+      await callCloudFunction('financeDailyCalc', {})
       Taro.showToast({title: '跑批完成', icon: 'success'})
       await loadData()
     } finally {
@@ -105,14 +102,7 @@ function AdminFinancePage() {
   const handleTriggerDate = async (dateStr: string) => {
     setCalcLoading(true)
     try {
-      const {error} = await supabase.functions.invoke('finance-daily-calc', {
-        method: 'POST',
-        body: {date: dateStr}
-      })
-      if (error) {
-        Taro.showToast({title: '重算失败', icon: 'none'})
-        return
-      }
+      await callCloudFunction('financeDailyCalc', {date: dateStr})
       Taro.showToast({title: `${dateStr} 重算完成`, icon: 'success'})
       await loadData()
     } finally {

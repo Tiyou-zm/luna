@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     }
 
     const hermesBaseUrl = Deno.env.get('HERMES_BASE_URL') || 'http://152.136.47.2:8642'
-    const hermesApiKey = Deno.env.get('HERMES_API_KEY') || 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+    const hermesApiKey = Deno.env.get('HERMES_API_KEY') || ''
 
     // ── Step 1：本地解析 profile_url，提取 xhs_user_id ──────────────────
     // 先在本地处理，不依赖 Hermes，减少失败点

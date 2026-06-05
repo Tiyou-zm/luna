@@ -18,8 +18,8 @@ cd output
 git init
 
 # 2. 设置用户信息
-git config user.name "miaoda"
-git config user.email "miaoda@baidu.com"
+git config user.name "luna"
+git config user.email "luna@example.com"
 
 echo ".sync" >> .gitignore
 echo "history/*.json" >> .gitignore
@@ -71,7 +71,7 @@ chmod +x .git/hooks/post-commit
 # 5. 添加所有文件到暂存区
 git add .
 
-git commit -m "Initial miaoda project setup with Taro weapp template $AGILE_REVISION"
+git commit -m "Initial Luna project setup with Taro weapp template $AGILE_REVISION"
 
 rm -rf .sync
 

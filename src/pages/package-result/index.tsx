@@ -2,15 +2,17 @@ import {useState, useCallback, useEffect, useMemo} from 'react'
 import Taro, {useShareAppMessage, useShareTimeline} from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {getMaterialById} from '@/db/api'
+import {withTimeout} from '@/utils/async'
 import type {Material, PackagePlatformResult} from '@/db/types'
 
 // ── 平台顺序 ────────────────────────────────────────────────────
-const PLATFORMS = ['小红书', '抖音', '视频号', '公众号']
+const PLATFORMS = ['小红书', '抖音', '视频号', '朋友圈', '公众号']
 
 const PLATFORM_ICONS: Record<string, string> = {
   '小红书': 'i-mdi-flower-outline',
   '抖音':   'i-mdi-music-note-outline',
   '视频号': 'i-mdi-wechat',
+  '朋友圈': 'i-mdi-account-group-outline',
   '公众号': 'i-mdi-newspaper-variant-outline',
 }
 
@@ -22,8 +24,11 @@ const SECTION_LABELS: Array<{key: keyof PackagePlatformResult; label: string; ic
   {key: 'hashtags',         label: '话题标签',     icon: 'i-mdi-pound'},
   {key: 'best_time',        label: '发布时间',     icon: 'i-mdi-clock-outline'},
   {key: 'ad_advice',        label: '投放建议',     icon: 'i-mdi-bullseye-arrow'},
+  {key: 'push_advice',      label: '推送建议',     icon: 'i-mdi-send-clock-outline'},
+  {key: 'delivery_logic',   label: '投放逻辑',     icon: 'i-mdi-chart-timeline-variant'},
+  {key: 'fact_check_notes', label: '质检说明',     icon: 'i-mdi-check-decagram-outline'},
   {key: 'risk_warning',     label: '风险提醒',     icon: 'i-mdi-shield-outline'},
-]
+] as Array<{key: keyof PackagePlatformResult; label: string; icon: string}>
 
 function renderValue(key: keyof PackagePlatformResult, value: unknown): string {
   if (Array.isArray(value)) {
@@ -147,9 +152,15 @@ function PackageResultPage() {
   const loadMaterial = useCallback(async () => {
     if (!materialId) { setLoading(false); return }
     setLoading(true)
-    const data = await getMaterialById(materialId)
-    setMaterial(data)
-    setLoading(false)
+    try {
+      const data = await withTimeout(getMaterialById(materialId), 10000, 'material result timeout')
+      setMaterial(data)
+    } catch (e) {
+      console.error('load material result error:', e)
+      setMaterial(null)
+    } finally {
+      setLoading(false)
+    }
   }, [materialId])
 
   useEffect(() => { loadMaterial() }, [loadMaterial])

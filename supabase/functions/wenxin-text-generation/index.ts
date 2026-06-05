@@ -41,10 +41,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!apiKey) {
     return Response.json({error: '服务配置错误：缺少 API 密钥'}, {status: 500, headers: corsHeaders})
   }
+  const upstreamUrl = Deno.env.get('WENXIN_CHAT_COMPLETIONS_URL')
+  if (!upstreamUrl) {
+    return Response.json({error: '服务配置错误：缺少 WENXIN_CHAT_COMPLETIONS_URL'}, {status: 500, headers: corsHeaders})
+  }
 
   // 调用文心大模型上游 SSE 接口
   const upstream = await fetch(
-    'https://app-b9plzy10uj29-api-zYkZz8qovQ1L-gateway.appmiaoda.com/v2/chat/completions',
+    upstreamUrl,
     {
       method: 'POST',
       headers: {

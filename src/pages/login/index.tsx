@@ -1,13 +1,13 @@
 // @title 登录
 import {useState} from 'react'
 import Taro from '@tarojs/taro'
-import {Image} from '@tarojs/components'
+import {LunaAvatar} from '@/components/LunaAvatar'
 import {useAuth} from '@/contexts/AuthContext'
 import {STORAGE_KEY_REDIRECT_PATH} from '@/components/RouteGuard'
 
 const TAB_PAGES = [
   '/pages/chat/index',
-  '/pages/features/index',
+  '/pages/materials/index',
   '/pages/service/index',
   '/pages/profile/index'
 ]
@@ -21,14 +21,22 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [wechatLoading, setWechatLoading] = useState(false)
 
-  const redirectAfterLogin = () => {
+  const redirectAfterLogin = async () => {
     const redirectPath = Taro.getStorageSync(STORAGE_KEY_REDIRECT_PATH) || '/pages/chat/index'
     Taro.removeStorageSync(STORAGE_KEY_REDIRECT_PATH)
     const normalizedPath = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`
-    if (TAB_PAGES.includes(normalizedPath)) {
-      Taro.switchTab({url: normalizedPath})
-    } else {
-      Taro.navigateTo({url: normalizedPath})
+    const isTabPage = TAB_PAGES.includes(normalizedPath)
+    console.info('[Login] redirect start', {url: normalizedPath, isTabPage})
+    try {
+      if (isTabPage) {
+        await Taro.switchTab({url: normalizedPath})
+      } else {
+        await Taro.navigateTo({url: normalizedPath})
+      }
+      console.info('[Login] redirect success', {url: normalizedPath})
+    } catch (error) {
+      console.warn('[Login] redirect failed, fallback to workbench', error)
+      await Taro.reLaunch({url: '/pages/chat/index'})
     }
   }
 
@@ -39,6 +47,10 @@ export default function LoginPage() {
     }
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       Taro.showToast({title: '用户名只能包含字母、数字和下划线', icon: 'none'})
+      return
+    }
+    if (password.length < 6) {
+      Taro.showToast({title: '密码至少 6 位', icon: 'none'})
       return
     }
     if (!agreed) {
@@ -53,14 +65,14 @@ export default function LoginPage() {
           Taro.showToast({title: error.message || '注册失败', icon: 'none'})
         } else {
           Taro.showToast({title: '注册成功', icon: 'success'})
-          redirectAfterLogin()
+          setTimeout(() => { redirectAfterLogin() }, 200)
         }
       } else {
         const {error} = await signInWithUsername(username, password)
         if (error) {
           Taro.showToast({title: '用户名或密码错误', icon: 'none'})
         } else {
-          redirectAfterLogin()
+          setTimeout(() => { redirectAfterLogin() }, 200)
         }
       }
     } finally {
@@ -79,7 +91,7 @@ export default function LoginPage() {
       if (error) {
         Taro.showToast({title: error.message || '微信登录失败', icon: 'none'})
       } else {
-        redirectAfterLogin()
+        setTimeout(() => { redirectAfterLogin() }, 200)
       }
     } finally {
       setWechatLoading(false)
@@ -115,11 +127,7 @@ export default function LoginPage() {
             marginBottom: '20px'
           }}
         >
-          <Image
-            src="https://miaoda-conversation-file.cdn.bcebos.com/user-b9kbo3bmsirk/app-b9plzy10uj29/20260512/915bc833-71ad-4312-90f0-3e7aba84690e.png"
-            mode="aspectFill"
-            style={{width: '100px', height: '100px'}}
-          />
+          <LunaAvatar size={100} iconSize={58} />
         </div>
         <h1
           className="font-black leading-none mb-2"

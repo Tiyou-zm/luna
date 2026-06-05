@@ -2,8 +2,8 @@ import {useState} from 'react'
 import Taro from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
-import {supabase} from '@/client/supabase'
-import {PLANS} from '@/db/types'
+import {callCloudFunction, callDbApi} from '@/client/cloudbase'
+import {ACTIVE_PLANS} from '@/db/types'
 import type {PlanOption} from '@/db/types'
 
 const PLAN_BADGES: Record<string, string> = {
@@ -13,6 +13,11 @@ const PLAN_BADGES: Record<string, string> = {
   video_pro: '达人',
   professional: '专业',
   enterprise: '企业'
+}
+
+function formatPlanQuota(value: number | null | undefined, unit: string) {
+  if (!value || value >= 999999) return '不限量'
+  return `${value}${unit}/月`
 }
 
 function PricingPage() {
@@ -37,23 +42,17 @@ function PricingPage() {
 
     setPaying(true)
     try {
-      let openid = profile?.openid as string | null
-      if (!openid) {
-        const loginResult = await Taro.login()
-        const {data: openidData} = await supabase.functions.invoke('get_wechat_openid', {body: {code: loginResult.code}})
-        openid = openidData?.openid
-      }
+      const openid = profile?.openid as string | null
       if (!openid) { Taro.showToast({title: '获取微信openid失败，请重试', icon: 'none'}); return }
 
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-      const {data, error} = await supabase.functions.invoke('create_wechat_payment', {
-        body: {openid, planName: selectedPlan.name, planLevel: selectedPlan.id, amount: selectedPlan.price},
-        headers: token ? {Authorization: `Bearer ${token}`} : {}
+      const data = await callCloudFunction<any>('createWechatPayment', {
+        openid,
+        planName: selectedPlan.name,
+        planLevel: selectedPlan.id,
+        amount: selectedPlan.price,
       })
-      if (error || !data?.success) {
-        const errMsg = error ? await error?.context?.text?.() : data?.error
-        Taro.showToast({title: errMsg || '创建订单失败', icon: 'none', duration: 3000})
+      if (!data?.success) {
+        Taro.showToast({title: data?.error || '创建订单失败', icon: 'none', duration: 3000})
         return
       }
       const {paymentParams, orderNo} = data
@@ -65,10 +64,13 @@ function PricingPage() {
         paySign: paymentParams.paySign,
         success: async () => {
           Taro.showToast({title: '支付确认中...', icon: 'loading', duration: 10000})
+          await callCloudFunction('createWechatPayment', {action: 'confirm', orderNo}).catch((error) => {
+            console.warn('confirm plan payment failed:', error)
+          })
           let attempts = 0
           const poll = async () => {
             attempts++
-            const {data: orderRow} = await supabase.from('orders').select('status').eq('order_no', orderNo).maybeSingle()
+            const orderRow = await callDbApi<any>('getOrderStatus', {orderNo})
             if (orderRow?.status === 'paid' || orderRow?.status === 'completed') {
               Taro.hideToast(); await refreshProfile()
               Taro.showToast({title: '套餐开通成功！', icon: 'success', duration: 3000})
@@ -106,7 +108,7 @@ function PricingPage() {
 
       {/* 套餐卡片列表 */}
       <div className="px-4 pt-5 flex flex-col gap-4">
-        {PLANS.map((plan) => {
+        {ACTIVE_PLANS.map((plan) => {
           const isSelected = selectedPlan?.id === plan.id
           const isCurrent = currentLevel === plan.id
           return (
@@ -147,7 +149,7 @@ function PricingPage() {
                       <span className="text-xl text-foreground">素材包生成</span>
                     </div>
                     <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
-                      {plan.packageCount} 次/月
+                      {formatPlanQuota(plan.packageCount, '次')}
                     </span>
                   </div>
                   {/* 趋势研究 */}
@@ -157,7 +159,7 @@ function PricingPage() {
                       <span className="text-xl text-foreground">趋势研究</span>
                     </div>
                     <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
-                      {plan.trendCount ? `${plan.trendCount} 次/月` : '暂未开放'}
+                      {formatPlanQuota(plan.trendCount, '次')}
                     </span>
                   </div>
                   {/* 图片额度 */}
@@ -167,7 +169,7 @@ function PricingPage() {
                       <span className="text-xl text-foreground">图片生成</span>
                     </div>
                     <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
-                      {plan.imageCount} 张/月
+                      {formatPlanQuota(plan.imageCount, '张')}
                     </span>
                   </div>
                   {/* 视频额度（有的话显示） */}
@@ -178,7 +180,7 @@ function PricingPage() {
                         <span className="text-xl text-foreground">视频生成</span>
                       </div>
                       <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
-                        {plan.videoSeconds}秒 ({plan.videoCount}条)
+                        {formatPlanQuota(plan.videoSeconds, '秒')}
                       </span>
                     </div>
                   )}

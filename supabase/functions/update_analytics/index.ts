@@ -130,7 +130,7 @@ async function triggerHermesBrief(
   }
 ) {
   const hermesBaseUrl = Deno.env.get('HERMES_BASE_URL') || 'http://152.136.47.2:8642'
-  const hermesApiKey = Deno.env.get('HERMES_API_KEY') || 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+  const hermesApiKey = Deno.env.get('HERMES_API_KEY') || ''
   const hermesModel = Deno.env.get('HERMES_MODEL') || 'hermes-agent'
 
   // Top3 内容概览（按互动合计排序）

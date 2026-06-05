@@ -3,6 +3,7 @@ import Taro, {useDidShow} from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
 import {getOrders, getComputeRecharges} from '@/db/api'
+import {withTimeout} from '@/utils/async'
 import {MEMBERSHIP_LABELS, PLANS} from '@/db/types'
 import type {Order, ComputeRecharge} from '@/db/types'
 
@@ -31,15 +32,27 @@ function OrdersPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('plan')
 
   const loadData = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setOrders([])
+      setRecharges([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    const [ordersData, rechargesData] = await Promise.all([
-      getOrders(user.id),
-      getComputeRecharges(user.id)
-    ])
-    setOrders(ordersData)
-    setRecharges(rechargesData)
-    setLoading(false)
+    try {
+      const [ordersData, rechargesData] = await withTimeout(Promise.all([
+        getOrders(user.id),
+        getComputeRecharges(user.id)
+      ]), 10000, 'orders timeout')
+      setOrders(ordersData)
+      setRecharges(rechargesData)
+    } catch (e) {
+      console.error('load orders error:', e)
+      setOrders([])
+      setRecharges([])
+    } finally {
+      setLoading(false)
+    }
   }, [user])
 
   useEffect(() => { loadData() }, [loadData])

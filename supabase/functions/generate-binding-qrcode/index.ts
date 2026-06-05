@@ -21,12 +21,15 @@ Deno.serve(async (req) => {
       )
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const webhookUrl = Deno.env.get('ANALYTICS_WEBHOOK_URL') || `${supabaseUrl}/functions/v1/update_analytics`
+
     // 二维码编码的 JSON 内容（Claw MCP 扫码后直接读取并自动配置）
     const qrContent = JSON.stringify({
       luna_user_id: user_id,
       platform,
       account_name,
-      webhook_url: 'https://backend.appmiaoda.com/projects/supabase307415807476936704/functions/v1/update_analytics',
+      webhook_url: webhookUrl,
       auth: 'Bearer claw-mcp-default-secret-2026',
     })
 
@@ -44,7 +47,7 @@ Deno.serve(async (req) => {
 
     // 上传到 Supabase Storage qrcodes bucket
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
+      supabaseUrl,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 

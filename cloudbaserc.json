@@ -1,0 +1,33 @@
+{
+  "envId": "cloud1-d3g0qen9b36b6a0b8",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "lunaGuardian",
+      "dir": "./cloudfunctions/lunaGuardian",
+      "handler": "index.main",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "memorySize": 512,
+      "installDependency": true
+    },
+    {
+      "name": "createWechatPayment",
+      "dir": "./cloudfunctions/createWechatPayment",
+      "handler": "index.main",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "memorySize": 512,
+      "installDependency": true
+    },
+    {
+      "name": "wechatPaymentCallback",
+      "dir": "./cloudfunctions/wechatPaymentCallback",
+      "handler": "index.main",
+      "runtime": "Nodejs18.15",
+      "timeout": 60,
+      "memorySize": 512,
+      "installDependency": true
+    }
+  ]
+}

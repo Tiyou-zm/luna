@@ -1,5 +1,5 @@
 import Taro from "@tarojs/taro";
-import { supabase } from "@/client/supabase";
+import {getCloudTempUrl, uploadCloudFile} from '@/client/cloudbase'
 
 /**
  * MIME type mappings for common file extensions
@@ -77,14 +77,6 @@ export interface FileInputOptions {
   userId?: string
 }
 
-/** Supported file data types */
-export type FileBody =
-  | ArrayBuffer
-  | ArrayBufferView
-  | Buffer
-  | File
-  | string
-
 /** File input type (MiniProgram or Web) */
 export type FileInput = MiniProgramFileInput | File
 
@@ -106,8 +98,8 @@ export function getMimeType(ext: string): string {
 }
 
 /**
- * Upload file to Supabase Storage
- * Supports both Web (File) and WeChat MiniProgram (tempFilePath) environments
+ * Upload file to CloudBase Storage.
+ * The legacy name is kept so existing pages do not need a large rename.
  */
 export async function uploadToSupabase(
   file: FileInput,
@@ -115,24 +107,15 @@ export async function uploadToSupabase(
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     const { bucket, userId  } = options
-
-    // Generate storage path
     const ext = file?.name?.split('.')?.pop() || 'file'
-    const storageName = `${userId || 'public'}/${generateFileName(ext)}`
-
-    // Prepare file body based on environment
-    const fileBody: FileBody = Taro.getEnv() === Taro.ENV_TYPE.WEB ? (file as File)
-      : (file as MiniProgramFileInput).tempFilePath
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(storageName, fileBody, { contentType: file.type, upsert: false })
-
-    if (error) {
-      throw error
+    const cloudPath = `${bucket}/${userId || 'public'}/${generateFileName(ext)}`
+    if (Taro.getEnv() === Taro.ENV_TYPE.WEB) {
+      throw new Error('CloudBase upload only supports WeChat Mini Program in this project')
     }
+    const fileID = await uploadCloudFile((file as MiniProgramFileInput).tempFilePath, cloudPath)
+    const publicUrl = await getCloudTempUrl(fileID)
 
-    return { success: true, data }
+    return { success: true, data: {path: cloudPath, fileID, publicUrl} }
   } catch (error: any) {
     return {
       success: false,

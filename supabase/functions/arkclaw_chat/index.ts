@@ -501,7 +501,7 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════
     // 调用 Hermes Agent
     // ════════════════════════════════════
-    const hermesApiKey = Deno.env.get('HERMES_API_KEY') || 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+    const hermesApiKey = Deno.env.get('HERMES_API_KEY') || ''
 
     const messages = [
       {role: 'system', content: SYSTEM_PROMPT},

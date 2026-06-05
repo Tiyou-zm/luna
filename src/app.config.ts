@@ -18,8 +18,11 @@ const pages = [
   'pages/package-result/index',
 ]
 
+const enableWxCloudConfig = process.env.TARO_APP_ENABLE_WX_CLOUD !== 'false'
+
 export default defineAppConfig({
   pages,
+  ...(enableWxCloudConfig ? {cloud: true} : {}),
   tabBar: {
     color: '#888888',
     selectedColor: '#6C5CE7',
@@ -33,8 +36,8 @@ export default defineAppConfig({
         selectedIconPath: './assets/icons/chat_selected.png'
       },
       {
-        pagePath: 'pages/features/index',
-        text: '功能',
+        pagePath: 'pages/materials/index',
+        text: '素材',
         iconPath: './assets/icons/features_unselected.png',
         selectedIconPath: './assets/icons/features_selected.png'
       },

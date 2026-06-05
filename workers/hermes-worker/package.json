@@ -1,0 +1,14 @@
+{
+  "name": "luna-hermes-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Long-running Hermes job worker for Luna Mini Program",
+  "main": "index.cjs",
+  "scripts": {
+    "start": "node index.cjs",
+    "once": "WORKER_ONCE=true node index.cjs"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.1"
+  }
+}

@@ -1,47 +1,43 @@
 // @title 工作台
-import {useState, useCallback, useMemo} from 'react'
+import {useState, useCallback, useMemo, useRef, useEffect} from 'react'
 import Taro, {useShareAppMessage, useShareTimeline} from '@tarojs/taro'
 import {Image, ScrollView} from '@tarojs/components'
-import {supabase} from '@/client/supabase'
-import {withRouteGuard} from '@/components/RouteGuard'
+import {callCloudFunction} from '@/client/cloudbase'
+import {STORAGE_KEY_REDIRECT_PATH, withRouteGuard} from '@/components/RouteGuard'
+import {LunaAvatar} from '@/components/LunaAvatar'
 import {useAuth} from '@/contexts/AuthContext'
-import {selectMediaFiles, selectMessageFile, uploadToSupabase, getMimeType} from '@/utils/upload'
+import {selectMediaFiles, selectMessageFile, getMimeType} from '@/utils/upload'
 import type {MiniProgramFileInput} from '@/utils/upload'
-
-// ── 直接调用 luna_guardian，绕开 customFetch 的无超时限制 ──────────
-// weapp Taro.request 默认 60s，supabase.functions.invoke 依赖 customFetch 无法设 timeout。
-// Hermes 完整素材包生成可能超过 60s，故此处用原生 Taro.request 并设 120s timeout。
-const SUPABASE_URL = process.env.TARO_APP_SUPABASE_URL!
-const SUPABASE_ANON_KEY = process.env.TARO_APP_SUPABASE_ANON_KEY!
+import {uploadToCos} from '@/utils/cos'
+import {getMiniWindowHeight} from '@/utils/system'
+import {safeNavigate} from '@/utils/navigation'
 
 async function callLunaGuardian(
   body: Record<string, unknown>,
-  token?: string,
 ): Promise<{data: Record<string, unknown> | null; error: string | null}> {
   try {
-    const res = await Taro.request({
-      url: `${SUPABASE_URL}/functions/v1/luna_guardian`,
-      method: 'POST',
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY,
-      },
-      data: body,
-      timeout: 120000,
-    })
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      const errText = typeof res.data === 'string' ? res.data : JSON.stringify(res.data)
-      return {data: null, error: `HTTP ${res.statusCode}: ${errText.slice(0, 200)}`}
-    }
-    const parsed = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
-    return {data: parsed, error: null}
+    const data = await callCloudFunction<Record<string, unknown>>('lunaGuardian', body)
+    return {data, error: null}
   } catch (e) {
     return {data: null, error: String(e)}
   }
 }
 
-const LUNA_AVATAR = 'https://miaoda-conversation-file.cdn.bcebos.com/user-b9kbo3bmsirk/conv-b9plzy10uj28/20260428/file-b9qfv1zaaups.png'
+function isCloudFunctionTimeout(error: unknown) {
+  const text = String(error)
+  return text.includes('-504003')
+    || text.includes('-404005')
+    || text.includes('FUNCTIONS_TIME_LIMIT_EXCEEDED')
+    || text.includes('timed out after 3 seconds')
+    || text.includes('exceed max poll retry')
+}
+
+function getLunaErrorMessage(error: unknown) {
+  if (isCloudFunctionTimeout(error)) {
+    return '同步生成超过微信轮询上限，已改为 30 秒内返回；请重新部署 lunaGuardian 后再试'
+  }
+  return '发送失败，请重试'
+}
 
 // ── 消息类型定义 ───────────────────────────────────────────────────
 type TaskType =
@@ -64,6 +60,15 @@ interface ResultCard {
   summary: string
 }
 
+interface InteractionCard {
+  intent: 'outline' | 'confirm_start' | 'start_generation'
+  title: string
+  reply: string
+  outlineText: string
+  rawBody: Record<string, unknown>
+  task?: Record<string, unknown> | null
+}
+
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -71,6 +76,7 @@ interface ChatMessage {
   image_url?: string | null
   taskCard?: TaskCard | null
   resultCard?: ResultCard | null
+  interactionCard?: InteractionCard | null
   /** 上传预览气泡：true 表示待发送，仅在消息流中占位展示 */
   isPending?: boolean
   /** 文件附件名称（文件类型时显示） */
@@ -179,7 +185,7 @@ function TaskCardView({card, onGenerate, onEdit, onAskMore}: {
 // ── 结果摘要卡片组件 ──────────────────────────────────────────────
 function ResultCardView({card}: {card: ResultCard}) {
   const handleView = () => {
-    Taro.navigateTo({url: `/pages/package-result/index?id=${encodeURIComponent(card.materialId)}`})
+    safeNavigate(`/pages/package-result/index?id=${encodeURIComponent(card.materialId)}`)
   }
   return (
     <div className="rounded-2xl overflow-hidden border" style={{background: 'white', borderColor: 'hsl(141 60% 45% / 0.25)', boxShadow: '0 4px 16px hsl(141 60% 45% / 0.1)'}}>
@@ -214,30 +220,103 @@ function ResultCardView({card}: {card: ResultCard}) {
 }
 
 // ── 主页面 ────────────────────────────────────────────────────────
+function InteractionCardView({card, onConfirm, onContinue}: {
+  card: InteractionCard
+  onConfirm: () => void
+  onContinue: () => void
+}) {
+  return (
+    <div className="rounded-2xl overflow-hidden border" style={{background: 'white', borderColor: 'hsl(243 67% 57% / 0.22)', boxShadow: '0 4px 16px hsl(243 67% 57% / 0.12)'}}>
+      <div className="px-4 py-3 flex items-center gap-2" style={{background: 'linear-gradient(135deg, hsl(243 67% 57%), hsl(263 60% 64%))'}}>
+        <div className="i-mdi-clipboard-check-outline text-white" style={{fontSize: '18px'}} />
+        <span className="text-xl font-bold text-white">{card.title}</span>
+      </div>
+      <div className="px-4 py-3">
+        <p className="text-xl text-foreground leading-relaxed" style={{whiteSpace: 'pre-wrap'}}>{card.outlineText || card.reply}</p>
+      </div>
+      <div className="px-4 pb-4 flex gap-2">
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="flex-1 flex items-center justify-center leading-none rounded-xl"
+          style={{background: 'linear-gradient(135deg, hsl(243 67% 57%), hsl(263 60% 64%))', boxShadow: '0 4px 12px hsl(243 67% 57% / 0.3)'}}
+        >
+          <div style={{padding: '10px 0'}}>
+            <span className="text-xl font-bold text-white">确认开始制作</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="flex items-center justify-center leading-none rounded-xl border"
+          style={{padding: '10px 14px', background: 'white', borderColor: 'hsl(243 67% 57% / 0.3)', color: 'hsl(243 67% 57%)'}}
+        >
+          <span className="text-xl font-medium">继续补充</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function WorkbenchPage() {
   const {user, profile} = useAuth()
+  const [bootReady, setBootReady] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME])
   const [inputText, setInputText] = useState('')
   // pendingAttachment: 上传完成的附件 metadata，发送时携带给后端
   const [pendingAttachment, setPendingAttachment] = useState<AttachmentMeta | null>(null)
   const [uploading, setUploading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [stableWindowHeight] = useState(() => (
+    Taro.getEnv() === Taro.ENV_TYPE.WEB ? 812 : getMiniWindowHeight()
+  ))
+  const lastTapAt = useRef(0)
 
   useShareAppMessage(() => ({title: 'Luna AI — 内容创作工作台'}))
   useShareTimeline(() => ({title: 'Luna AI — 内容创作工作台'}))
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBootReady(true), 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const lastMsgId = useMemo(() => {
     const last = messages[messages.length - 1]
     return last ? `msg_${last.id.replace(/[^a-zA-Z0-9]/g, '_')}` : ''
   }, [messages])
 
+  const runTap = useCallback((action: () => void) => {
+    const now = Date.now()
+    if (now - lastTapAt.current < 250) return
+    lastTapAt.current = now
+    action()
+  }, [])
+
+  const requireLogin = useCallback(() => {
+    if (user) return true
+    Taro.showModal({
+      title: '需要登录',
+      content: '登录后可以生成内容、上传素材，并保存到你的素材库。',
+      confirmText: '去登录',
+      cancelText: '先看看',
+      success: ({confirm}) => {
+        if (confirm) {
+          Taro.setStorageSync(STORAGE_KEY_REDIRECT_PATH, '/pages/chat/index')
+          safeNavigate('/pages/login/index')
+        }
+      },
+    })
+    return false
+  }, [user])
+
   // ── 发送消息 ────────────────────────────────────────────────────
   const handleSend = useCallback(async (quickText?: string) => {
+    if (!requireLogin()) return
     const text = (quickText ?? inputText).trim()
     const attachment = pendingAttachment
     const isImageAttach = attachment?.type === 'image'
     if (!text && !attachment) return
-    if (sending || !user) return
+    if (sending) return
 
     // 只有附件没有文字时，自动补充描述让 Luna 知道有素材要处理
     const effectiveText = text || (isImageAttach
@@ -260,11 +339,8 @@ function WorkbenchPage() {
     setMessages((prev) => [...prev.filter((m) => m.id !== 'upload_preview'), userMsg])
 
     try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-
       const history = messages
-        .filter((m) => !m.isPending && (m.role === 'user' || (m.role === 'assistant' && !m.taskCard && !m.resultCard)))
+        .filter((m) => !m.isPending && (m.role === 'user' || (m.role === 'assistant' && !m.taskCard && !m.resultCard && !m.interactionCard)))
         .filter((m) => m.content && m.content.trim())
         .slice(-10)
         .map((m) => ({role: m.role, content: m.content}))
@@ -281,14 +357,14 @@ function WorkbenchPage() {
       }] : []
 
       const body: Record<string, unknown> = {
-        user_id: user.id,
+        user_id: user?.id || 'wechat_session',
         user_message: effectiveText,
         attachments,
         history,
         platforms: ['小红书', '抖音', '视频号', '公众号'],
       }
 
-      const {data, error} = await callLunaGuardian(body, token)
+      const {data, error} = await callLunaGuardian(body)
 
       if (error) throw new Error(error)
 
@@ -296,8 +372,43 @@ function WorkbenchPage() {
       const reply: string = (data?.reply as string) || ''
       const result = (data?.result as Record<string, unknown>) || null
       const materialId: string | null = (data?.material_id as string) || null
+      const accepted = Boolean(data?.accepted || data?.job_id)
+      const interactionIntent = String(data?.interaction_intent || '')
+      const interaction = (data?.interaction || {}) as Record<string, unknown>
+      const interactionOutline = data?.outline || interaction.outline || null
+      const interactionTask = (data?.task || interaction.task || null) as Record<string, unknown> | null
 
-      if ((taskType === 'material_package' || taskType === 'direction_package'
+      if (accepted) {
+        setMessages((prev) => [...prev, {
+          id: `j_${Date.now()}`,
+          role: 'assistant',
+          content: reply || 'Luna 已收到任务，Hermes 会在后台制作素材包。完成后会按文案、视频脚本、投放分析和素材文件归档到素材库。',
+          created_at: new Date().toISOString(),
+        }])
+      } else if (['outline', 'confirm_start', 'start_generation'].includes(interactionIntent)) {
+        const outlineText = typeof interactionOutline === 'string'
+          ? interactionOutline
+          : interactionOutline ? JSON.stringify(interactionOutline, null, 2) : reply
+        const interactionCard: InteractionCard = {
+          intent: interactionIntent as InteractionCard['intent'],
+          title: interactionIntent === 'outline' ? 'Hermes 生成了制作大纲' : 'Hermes 请求确认开始制作',
+          reply,
+          outlineText,
+          rawBody: {
+            ...body,
+            pending_task: interactionTask,
+            confirmed_outline: interactionOutline || reply,
+          },
+          task: interactionTask,
+        }
+        setMessages((prev) => [...prev, {
+          id: `i_${Date.now()}`,
+          role: 'assistant',
+          content: reply,
+          interactionCard,
+          created_at: new Date().toISOString(),
+        }])
+      } else if ((taskType === 'material_package' || taskType === 'direction_package'
         || taskType === 'copy_rewrite' || taskType === 'video_script' || taskType === 'advice_only')
         && !result) {
         const platforms = ['小红书', '抖音', '视频号', '公众号']
@@ -307,7 +418,7 @@ function WorkbenchPage() {
           source: attachment
             ? (isImageAttach ? '用户上传图片 + 文字描述' : `上传文件「${attachment.name}」`)
             : (text ? `"${text.slice(0, 30)}"` : '用户描述'),
-          output: taskType === 'video_script' ? '短视频脚本' : taskType === 'copy_rewrite' ? '多平台改写文案' : '多平台素材包（标题 / 正文 / 话题标签 / 投放建议）',
+          output: taskType === 'video_script' ? '短视频脚本 / 推送建议 / 投放逻辑' : taskType === 'copy_rewrite' ? '多平台改写文案' : '多平台素材包（文案 / 图片提示词 / 视频脚本 / 投放分析）',
           taskType,
           rawBody: body,
         }
@@ -338,34 +449,50 @@ function WorkbenchPage() {
           created_at: new Date().toISOString(),
         }])
       }
-    } catch {
-      Taro.showToast({title: '发送失败，请重试', icon: 'none'})
+    } catch (error) {
+      console.error('Luna send failed:', error)
+      const message = getLunaErrorMessage(error)
+      Taro.showToast({title: message.slice(0, 20), icon: 'none', duration: 3000})
+      if (isCloudFunctionTimeout(error)) {
+        setMessages((prev) => [...prev, {
+          id: `e_${Date.now()}`,
+          role: 'assistant',
+          content: message,
+          created_at: new Date().toISOString(),
+        }])
+      }
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
     } finally {
       setSending(false)
     }
-  }, [inputText, pendingAttachment, sending, user, messages])
+  }, [inputText, pendingAttachment, requireLogin, sending, user, messages])
 
   // ── 任务卡：直接生成 ────────────────────────────────────────────
   const handleDirectGenerate = useCallback(async (taskCard: TaskCard) => {
-    if (sending || !user) return
+    if (sending) return
+    if (!requireLogin()) return
     setSending(true)
     Taro.showToast({title: '生成中，请稍候…', icon: 'none', duration: 3000})
     try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
       const body: Record<string, unknown> = {
         ...taskCard.rawBody,
-        user_id: user.id,
+        user_id: user?.id || 'wechat_session',
         mode: taskCard.taskType === 'direction_package' ? 'direction' : 'material',
         platforms: taskCard.platform,
       }
-      const {data, error} = await callLunaGuardian(body, token)
+      const {data, error} = await callLunaGuardian(body)
       if (error) throw new Error(error)
       const result = (data?.result as Record<string, unknown>) || null
       const materialId: string | null = (data?.material_id as string) || null
       const reply: string = (data?.reply as string) || '已生成完成'
-      if (result && materialId) {
+      if (Boolean(data?.accepted || data?.job_id)) {
+        setMessages((prev) => [...prev, {
+          id: `j_${Date.now()}`,
+          role: 'assistant' as const,
+          content: reply || '任务已开始制作，完成后会自动进入素材库，并按栏目整理。',
+          created_at: new Date().toISOString(),
+        }])
+      } else if (result && materialId) {
         const platforms = Object.keys(result)
         const firstPlatform = platforms[0] || '小红书'
         const firstResult = (result[firstPlatform] || {}) as Record<string, unknown>
@@ -385,32 +512,85 @@ function WorkbenchPage() {
           created_at: new Date().toISOString(),
         }])
       }
-    } catch {
-      Taro.showToast({title: '生成失败，请重试', icon: 'none'})
+    } catch (error) {
+      console.error('Luna direct generate failed:', error)
+      Taro.showToast({title: getLunaErrorMessage(error).slice(0, 20), icon: 'none', duration: 3000})
     } finally {
       setSending(false)
     }
-  }, [sending, user])
+  }, [requireLogin, sending, user])
 
   // ── 任务卡：编辑任务（跳转高级编辑）───────────────────────────
+  const handleConfirmInteraction = useCallback(async (card: InteractionCard) => {
+    if (sending) return
+    if (!requireLogin()) return
+    setSending(true)
+    Taro.showToast({title: '已确认，开始制作', icon: 'none', duration: 2000})
+    try {
+      const body: Record<string, unknown> = {
+        ...card.rawBody,
+        user_id: user?.id || 'wechat_session',
+        action: 'start_generation',
+        user_message: '确认开始制作',
+        confirmed_outline: card.rawBody.confirmed_outline || card.outlineText || card.reply,
+        pending_task: card.task || card.rawBody.pending_task || null,
+      }
+      const {data, error} = await callLunaGuardian(body)
+      if (error) throw new Error(error)
+      const reply: string = (data?.reply as string) || '任务已开始制作，完成后会自动进入素材库。'
+      setMessages((prev) => [...prev, {
+        id: `j_${Date.now()}`,
+        role: 'assistant',
+        content: reply,
+        created_at: new Date().toISOString(),
+      }])
+    } catch (error) {
+      console.error('Luna confirm generation failed:', error)
+      Taro.showToast({title: getLunaErrorMessage(error).slice(0, 20), icon: 'none', duration: 3000})
+    } finally {
+      setSending(false)
+    }
+  }, [requireLogin, sending, user])
+
+  const handleContinueInteraction = useCallback((card: InteractionCard) => {
+    setInputText(card.intent === 'outline' ? '我想调整这个大纲：' : '我再补充一点：')
+  }, [])
+
   const handleEditTask = (taskCard: TaskCard) => {
     const mode = taskCard.taskType === 'direction_package' ? 'direction' : 'material'
-    Taro.navigateTo({url: `/pages/package-create/index?mode=${mode}`})
+    safeNavigate(`/pages/package-create/index?mode=${mode}`)
   }
 
   // ── 任务卡：补充信息 ────────────────────────────────────────────
   const handleAskMore = useCallback(() => {
+    const lastUserMessage = [...messages].reverse().find((item) => item.role === 'user')?.content || ''
+    const summary = lastUserMessage.trim()
+      ? `围绕“${lastUserMessage.trim().slice(0, 22)}${lastUserMessage.trim().length > 22 ? '...' : ''}”，我还需要补齐：`
+      : '我还需要补齐几个关键信息：'
+    const needsAssetHint = !/上传|图片|素材|文档|链接|截图/.test(lastUserMessage)
+    const needsPlatformHint = !/小红书|抖音|朋友圈|公众号|视频号/.test(lastUserMessage)
+    const lines = [
+      summary,
+      '• 产品、行业或主题的核心卖点是什么？',
+      needsPlatformHint ? '• 目标平台要选哪些？小红书、抖音、朋友圈、公众号都可以。' : '',
+      '• 本次目标更偏曝光、转化、涨粉，还是活动引流？',
+      needsAssetHint ? '• 有没有图片、文档、链接或现有文案要作为素材？' : '',
+      '• 有没有必须保留的信息、禁用词或价格/活动节点？',
+      '',
+      '短视频部分默认只产出脚本、推送建议和投放逻辑，不生成视频文件。'
+    ].filter(Boolean)
     setMessages((prev) => [...prev, {
       id: `a_${Date.now()}`,
       role: 'assistant',
-      content: '好的，请告诉我更多信息：\n• 目标平台（小红书/抖音/公众号…）\n• 投放目标（涨粉/促销/品牌曝光…）\n• 产品/服务的核心亮点或活动信息\n\n你也可以直接上传图片、文档或视频截图作为素材。',
+      content: lines.join('\n'),
       created_at: new Date().toISOString(),
     }])
-  }, [])
+  }, [messages])
 
   // ── 素材附件上传（任意格式）────────────────────────────────────
   const handlePickAttachment = async () => {
     if (uploading || sending) return
+    if (!requireLogin()) return
     try {
       const idx = await new Promise<number>((resolve) => {
         Taro.showActionSheet({
@@ -431,14 +611,14 @@ function WorkbenchPage() {
         }
         Taro.showToast({title: '上传中…', icon: 'none'})
         const file = files[0]
-        const result = await uploadToSupabase(file, {bucket: 'cs-images', userId: user?.id || 'guest'})
+        const result = await uploadToCos(file)
         if (!result.success || !result.data) {
           Taro.showToast({title: '上传失败，请重试', icon: 'none'})
           setUploading(false)
           return
         }
-        const fileKey = result.data.path
-        const publicUrl = supabase.storage.from('cs-images').getPublicUrl(fileKey).data.publicUrl
+        const fileKey = result.data.key
+        const publicUrl = result.data.url
         const tempPath = (file as MiniProgramFileInput).tempFilePath || ''
         const fileName = (file as MiniProgramFileInput).name || '图片'
         const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg'
@@ -478,14 +658,14 @@ function WorkbenchPage() {
           return
         }
         Taro.showToast({title: '上传中…', icon: 'none'})
-        const result = await uploadToSupabase(file, {bucket: 'cs-images', userId: user?.id || 'guest'})
+        const result = await uploadToCos(file)
         if (!result.success || !result.data) {
           Taro.showToast({title: '上传失败，请重试', icon: 'none'})
           setUploading(false)
           return
         }
-        const fileKey = result.data.path
-        const publicUrl = supabase.storage.from('cs-images').getPublicUrl(fileKey).data.publicUrl
+        const fileKey = result.data.key
+        const publicUrl = result.data.url
         const fileName = (file as MiniProgramFileInput).name || '素材文件'
         const ext = fileName.split('.').pop()?.toLowerCase() || 'file'
         const meta: AttachmentMeta = {
@@ -521,9 +701,34 @@ function WorkbenchPage() {
   const canSend = (inputText.trim() || !!pendingAttachment) && !sending && !uploading
   const planLabel = profile?.membership_level === 'free' ? '免费版' : (profile?.membership_level || '免费版')
 
-  const containerHeight = Taro.getEnv() === Taro.ENV_TYPE.WEB
-    ? 'calc(100vh - 50px)'
-    : `${Taro.getSystemInfoSync().windowHeight}px`
+  const isWeb = Taro.getEnv() === Taro.ENV_TYPE.WEB
+  const windowHeight = isWeb ? 812 : stableWindowHeight
+  const tabBarReserve = isWeb ? 0 : 6
+  const usableHeight = Math.max(360, windowHeight - tabBarReserve)
+  const containerHeight = isWeb ? 'calc(100vh - 50px)' : `${usableHeight}px`
+  // WeChat scroll-view does not always resolve height: 100% inside flex children.
+  const messageListHeight = isWeb
+    ? 'calc(100vh - 50px - 58px - 45px - 66px)'
+    : `${Math.max(180, usableHeight - 58 - 45 - 66)}px`
+
+  if (!bootReady) {
+    return (
+      <div style={{height: containerHeight, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'hsl(252 30% 97%)'}}>
+        <div className="flex-shrink-0 px-4 pt-4 pb-3" style={{background: 'linear-gradient(135deg, hsl(243 67% 57%) 0%, hsl(263 60% 64%) 100%)'}}>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full overflow-hidden border-2 border-white/40" style={{width: '36px', height: '36px', background: 'hsl(252 60% 80%)'}}>
+              <LunaAvatar size={36} />
+            </div>
+            <div>
+              <span className="text-xl font-bold text-white">Luna AI 工作台</span>
+              <p className="text-xl" style={{color: 'rgba(255,255,255,0.7)'}}>自由对话 · 多平台内容生成</p>
+            </div>
+          </div>
+        </div>
+        <div style={{flex: 1, background: 'hsl(252 30% 97%)'}} />
+      </div>
+    )
+  }
 
   return (
     <div style={{height: containerHeight, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'hsl(252 30% 97%)'}}>
@@ -532,7 +737,7 @@ function WorkbenchPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-full overflow-hidden border-2 border-white/40" style={{width: '36px', height: '36px', background: 'hsl(252 60% 80%)'}}>
-              <Image src={LUNA_AVATAR} mode="aspectFill" style={{width: '36px', height: '36px'}} />
+              <LunaAvatar size={36} />
             </div>
             <div>
               <span className="text-xl font-bold text-white">Luna AI 工作台</span>
@@ -543,7 +748,8 @@ function WorkbenchPage() {
             <div
               className="flex items-center gap-1 px-2 py-1 rounded-full"
               style={{background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)'}}
-              onClick={() => Taro.switchTab({url: '/pages/profile/index'})}
+              onClick={() => runTap(() => Taro.switchTab({url: '/pages/profile/index'}))}
+              onTouchEnd={() => runTap(() => Taro.switchTab({url: '/pages/profile/index'}))}
             >
               <div className="i-mdi-crown-outline text-white" style={{fontSize: '14px'}} />
               <span className="text-xl text-white">{planLabel}</span>
@@ -553,13 +759,13 @@ function WorkbenchPage() {
       </div>
 
       {/* ── 快捷提示词（横向滚动）── */}
-      <ScrollView scrollX className="flex-shrink-0" style={{whiteSpace: 'nowrap', paddingLeft: '16px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', background: 'white', borderBottom: '1px solid hsl(252 20% 92%)'}}>
-        <div style={{display: 'inline-flex', gap: '8px'}}>
+      <ScrollView scrollX className="flex-shrink-0" style={{whiteSpace: 'nowrap', background: 'white', borderBottom: '1px solid hsl(252 20% 92%)'}}>
+        <div style={{display: 'inline-flex', gap: '8px', padding: '8px 16px'}}>
           {QUICK_PROMPTS.map((q) => (
             <button
               key={q}
-              type="button"
-              onClick={() => handleSend(q)}
+              onClick={() => runTap(() => handleSend(q))}
+              onTouchEnd={() => runTap(() => handleSend(q))}
               className="flex-shrink-0 flex items-center justify-center leading-none rounded-full"
               style={{padding: '5px 12px', background: 'hsl(243 67% 57% / 0.08)', border: '1.5px solid hsl(243 67% 57% / 0.25)', color: 'hsl(243 67% 57%)', whiteSpace: 'nowrap'}}
             >
@@ -569,9 +775,13 @@ function WorkbenchPage() {
         </div>
       </ScrollView>
 
-      {/* ── 消息列表（ScrollView 必须放在有明确高度的容器里）── */}
-      <div style={{flex: 1, overflow: 'hidden'}}>
-        <ScrollView scrollY scrollIntoView={lastMsgId} scrollWithAnimation style={{height: '100%'}}>
+      {/* ── 消息列表（微信小程序必须给 scroll-view 明确高度）── */}
+      <ScrollView
+        scrollY
+        scrollIntoView={lastMsgId}
+        scrollWithAnimation
+        style={{height: messageListHeight, background: 'hsl(252 30% 97%)'}}
+      >
           <div className="px-4 py-3 flex flex-col gap-4">
           {messages.map((msg) => {
             const isUser = msg.role === 'user'
@@ -629,11 +839,11 @@ function WorkbenchPage() {
                   /* Luna 消息 */
                   <div className="flex items-end gap-2">
                     <div className="rounded-full overflow-hidden flex-shrink-0 border-2 border-white" style={{width: '36px', height: '36px', background: 'linear-gradient(135deg, hsl(243 67% 57%), hsl(263 60% 64%))', boxShadow: '0 2px 8px hsl(243 67% 57% / 0.3)', flexShrink: 0}}>
-                      <Image src={LUNA_AVATAR} mode="aspectFill" style={{width: '36px', height: '36px'}} />
+                       <LunaAvatar size={36} />
                     </div>
                     <div className="flex flex-col gap-2" style={{maxWidth: '82%'}}>
                       {/* 文字内容 */}
-                      {msg.content && (
+                      {msg.content && !msg.taskCard && !msg.resultCard && !msg.interactionCard && (
                         <div className="px-4 py-3" style={{background: 'white', borderRadius: '4px 16px 16px 16px', boxShadow: '0 2px 8px hsl(252 20% 80% / 0.25)', border: '1px solid hsl(252 20% 91%)'}}>
                           <p className="text-xl leading-relaxed whitespace-pre-wrap" style={{color: 'hsl(252 30% 20%)'}}>{msg.content}</p>
                         </div>
@@ -651,6 +861,13 @@ function WorkbenchPage() {
                       {msg.resultCard && (
                         <ResultCardView card={msg.resultCard} />
                       )}
+                      {msg.interactionCard && (
+                        <InteractionCardView
+                          card={msg.interactionCard}
+                          onConfirm={() => handleConfirmInteraction(msg.interactionCard!)}
+                          onContinue={() => handleContinueInteraction(msg.interactionCard!)}
+                        />
+                      )}
                     </div>
                   </div>
                 )}
@@ -662,7 +879,7 @@ function WorkbenchPage() {
           {sending && (
             <div className="flex items-end gap-2">
               <div className="rounded-full overflow-hidden flex-shrink-0 border-2 border-white" style={{width: '36px', height: '36px', background: 'linear-gradient(135deg, hsl(243 67% 57%), hsl(263 60% 64%))', boxShadow: '0 2px 8px hsl(243 67% 57% / 0.3)'}}>
-                <Image src={LUNA_AVATAR} mode="aspectFill" style={{width: '36px', height: '36px'}} />
+                 <LunaAvatar size={36} />
               </div>
               <div className="px-4 py-4" style={{background: 'white', borderRadius: '4px 16px 16px 16px', boxShadow: '0 2px 8px hsl(252 20% 80% / 0.25)', border: '1px solid hsl(252 20% 91%)'}}>
                 <div className="flex items-center gap-1.5">
@@ -676,7 +893,6 @@ function WorkbenchPage() {
           <div id="anchor_bottom" style={{height: '8px'}} />
         </div>
       </ScrollView>
-      </div>
 
       {/* ── 输入区（flex-shrink-0，贴在 ScrollView 下方）── */}
       <div
@@ -744,8 +960,8 @@ function WorkbenchPage() {
         {/* 输入行 */}
         <div className="flex items-center gap-2 px-4" style={{paddingTop: '10px', paddingBottom: '4px'}}>
           <button
-            type="button"
-            onClick={handlePickAttachment}
+            onClick={() => runTap(handlePickAttachment)}
+            onTouchEnd={() => runTap(handlePickAttachment)}
             className="flex items-center justify-center leading-none rounded-xl flex-shrink-0"
             style={{width: '44px', height: '44px', background: uploading ? 'hsl(252 20% 94%)' : 'hsl(243 67% 57% / 0.1)', border: '1.5px solid hsl(243 67% 57% / 0.3)', flexShrink: 0}}
           >
@@ -761,8 +977,8 @@ function WorkbenchPage() {
             />
           </div>
           <button
-            type="button"
-            onClick={() => handleSend()}
+            onClick={() => runTap(() => handleSend())}
+            onTouchEnd={() => runTap(() => handleSend())}
             className="flex items-center justify-center leading-none rounded-xl flex-shrink-0"
             style={{
               width: '44px', height: '44px',

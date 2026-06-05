@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     const platformLabel = platformNames[platform] ?? platform
 
     const hermesBaseUrl = Deno.env.get('HERMES_BASE_URL') || 'http://152.136.47.2:8642'
-    const hermesApiKey = Deno.env.get('HERMES_API_KEY') || 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+    const hermesApiKey = Deno.env.get('HERMES_API_KEY') || ''
 
     // 请求 Hermes 生成平台授权二维码
     // 约定回复格式：

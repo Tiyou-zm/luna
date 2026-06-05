@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       }
     ]
 
-    const apiKey = Deno.env.get('HERMES_API_KEY') || 'bWmhP67eBZsbta58h8QRKrZT0XcPh2NJ'
+    const apiKey = Deno.env.get('HERMES_API_KEY') || ''
     const baseUrl = Deno.env.get('HERMES_BASE_URL') || HERMES_BASE_URL
     const model = Deno.env.get('HERMES_MODEL') || HERMES_MODEL
 

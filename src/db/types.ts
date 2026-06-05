@@ -1,9 +1,9 @@
 // 数据库类型定义
 
-export type MembershipLevel = 'free' | 'graphic' | 'video_starter' | 'video_pro' | 'professional' | 'enterprise'
+export type MembershipLevel = 'trial' | 'free' | 'graphic' | 'video_starter' | 'video_pro' | 'professional' | 'enterprise'
 export type UserRole = 'user' | 'admin'
 export type OrderStatus = 'pending' | 'paid' | 'completed' | 'cancelled' | 'refunded'
-export type MaterialType = 'copywriting' | 'script' | 'work' | 'image'
+export type MaterialType = 'copywriting' | 'script' | 'work' | 'image' | 'analysis' | 'archive'
 export type AnalyticsGranularity = 'day' | 'week'
 export type TransferStatus = 'pending' | 'confirmed' | 'skipped'
 
@@ -124,6 +124,12 @@ export interface PackagePlatformResult {
   best_time: string
   ad_advice: string
   risk_warning: string
+  fact_check_notes?: string
+  delivery_logic?: string
+  push_advice?: string
+  duration?: number | string
+  hook?: string
+  sections?: Array<Record<string, unknown>>
 }
 
 export interface PackageConfig {
@@ -132,6 +138,11 @@ export interface PackageConfig {
   goal: string
   industry?: string
   task_type: string
+  version?: string
+  delivery_mode?: string | null
+  provider?: string
+  generation_job_id?: string
+  repair_used?: boolean
 }
 
 export interface Material {
@@ -143,10 +154,46 @@ export interface Material {
   package_config: PackageConfig | null
   package_result: Record<string, PackagePlatformResult> | null
   source_mode: 'material' | 'direction' | null
+  library_section?: 'copy' | 'video' | 'strategy' | 'asset' | 'archive'
+  parent_material_id?: string
+  platform_label?: string
+  metadata?: Record<string, unknown>
+  url?: string
+  key?: string
+  sizeStr?: string
+  workflow?: Record<string, unknown> | null
+  trending_research?: Record<string, unknown> | null
+  content_strategy?: Record<string, unknown> | null
+  assets?: Record<string, unknown> | null
+  package_archive?: Record<string, unknown> | null
+  qa?: Record<string, unknown> | null
+  final_checks?: Record<string, unknown> | null
   created_at: string
 }
 
 // 套餐定义
+export interface GenerationJob {
+  id: string
+  user_id: string
+  openid?: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  title: string
+  mode: 'material' | 'direction'
+  user_message: string
+  material_text?: string | null
+  industry?: string | null
+  goal: string
+  platforms: string[]
+  attachments?: Array<Record<string, unknown>>
+  progress_text?: string | null
+  result_material_id?: string | null
+  error_message?: string | null
+  created_at: string
+  updated_at: string
+  started_at?: string | null
+  finished_at?: string | null
+}
+
 export interface SocialAccount {
   id: string
   user_id: string
@@ -261,6 +308,19 @@ export interface PlanOption {
 
 export const PLANS: PlanOption[] = [
   {
+    id: 'trial',
+    name: '试用版',
+    price: 6.66,
+    packageCount: 999999,
+    trendCount: 999999,
+    imageCount: 999999,
+    graphicCount: 999999,
+    videoSeconds: 999999,
+    videoCount: null,
+    highlight: '一次完整素材包试用，含文案、脚本、投放建议与素材库归档',
+    icon: 'i-mdi-rocket-launch-outline'
+  },
+  {
     id: 'free',
     name: '免费版',
     price: 0,
@@ -341,6 +401,7 @@ export const PLANS: PlanOption[] = [
 ]
 
 export const MEMBERSHIP_LABELS: Record<MembershipLevel, string> = {
+  trial: '试用版',
   free: '免费版',
   graphic: '图文版',
   video_starter: '视频新手版',
@@ -348,6 +409,8 @@ export const MEMBERSHIP_LABELS: Record<MembershipLevel, string> = {
   professional: '专业版',
   enterprise: '企业版'
 }
+
+export const ACTIVE_PLANS: PlanOption[] = PLANS.filter((plan) => plan.id === 'trial')
 
 export interface UsageRecord {
   id: string

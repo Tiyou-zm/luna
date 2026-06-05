@@ -10,6 +10,111 @@ import prodConfig from './prod'
 
 const base = String(process.argv[process.argv.length - 1])
 const publicPath = base.startsWith('http') ? base : '/'
+const outputRoot = process.env.TARO_OUTPUT_ROOT || 'dist'
+
+const clientEnv = {
+  TARO_APP_APP_ID: process.env.TARO_APP_APP_ID || 'app-b9plzy10uj29',
+  TARO_APP_CLOUDBASE_ENV_ID: process.env.TARO_APP_CLOUDBASE_ENV_ID || '',
+  TARO_APP_AUTH_EMAIL_DOMAIN: process.env.TARO_APP_AUTH_EMAIL_DOMAIN || 'luna.local',
+  TARO_APP_COS_PUBLIC_BASE_URL:
+    process.env.TARO_APP_COS_PUBLIC_BASE_URL ||
+    'https://wechat-app-1409532217.cos-website.ap-beijing.myqcloud.com'
+}
+
+function replaceNodeProcessPlugin(): Plugin {
+  return {
+    name: 'replace-node-process-for-weapp',
+    enforce: 'pre',
+    transform(code) {
+      if (!code.includes('process.')) return null
+      return {
+        code: code
+          .replace(/\bprocess\.platform\b/g, JSON.stringify('wechat'))
+          .replace(/\bprocess\.version\b/g, JSON.stringify(''))
+          .replace(/\bprocess\.versions\b/g, '({})'),
+        map: null
+      }
+    }
+  }
+}
+
+const htmlToTaroComponents: Record<string, string> = {
+  div: 'View',
+  section: 'View',
+  main: 'View',
+  header: 'View',
+  footer: 'View',
+  article: 'View',
+  aside: 'View',
+  nav: 'View',
+  ul: 'View',
+  ol: 'View',
+  li: 'View',
+  span: 'View',
+  p: 'View',
+  strong: 'View',
+  em: 'View',
+  h1: 'View',
+  h2: 'View',
+  h3: 'View',
+  h4: 'View',
+  h5: 'View',
+  h6: 'View',
+  img: 'Image',
+  button: 'Button',
+  input: 'Input',
+  textarea: 'Textarea'
+}
+
+function addTaroComponentImports(code: string, components: Set<string>): string {
+  const importPattern = /import\s*\{([^}]*)\}\s*from\s*['"]@tarojs\/components['"];?/
+  const match = code.match(importPattern)
+  const needed = Array.from(components).sort()
+
+  if (!match) {
+    return `import {${needed.join(', ')}} from '@tarojs/components'\n${code}`
+  }
+
+  const current = match[1]
+    .split(',')
+    .map((item) => item.trim().split(/\s+as\s+/)[0]?.trim())
+    .filter(Boolean)
+  const missing = needed.filter((component) => !current.includes(component))
+
+  if (missing.length === 0) return code
+
+  return code.replace(importPattern, (statement, imports: string) => {
+    const nextImports = `${imports.trim()}, ${missing.join(', ')}`
+    return statement.replace(imports, nextImports)
+  })
+}
+
+function jsxHtmlToTaroTagsPlugin(): Plugin {
+  const tagPattern = new RegExp(`(<\\/?\\s*)(${Object.keys(htmlToTaroComponents).join('|')})(?=[\\s>/])`, 'g')
+
+  return {
+    name: 'jsx-html-to-taro-components',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.includes('/src/') && !id.includes('\\src\\')) return null
+      if (!/\.[jt]sx$/.test(id)) return null
+      if (!tagPattern.test(code)) return null
+
+      tagPattern.lastIndex = 0
+      const usedComponents = new Set<string>()
+      const transformed = code.replace(tagPattern, (_match, prefix: string, tag: string) => {
+        const component = htmlToTaroComponents[tag]
+        usedComponents.add(component)
+        return `${prefix}${component}`
+      })
+
+      return {
+        code: addTaroComponentImports(transformed, usedComponents),
+        map: null
+      }
+    }
+  }
+}
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'vite'>(async (merge) => {
@@ -24,17 +129,19 @@ export default defineConfig<'vite'>(async (merge) => {
       828: 1.81 / 2
     },
     sourceRoot: 'src',
-    outputRoot: 'dist',
+    outputRoot,
     plugins: [
-      '@tarojs/plugin-generator',
-      'miaoda-taro-plugin-html'
+      '@tarojs/plugin-generator'
     ],
     alias: {
-      '@': path.resolve(__dirname, '../src'),
-      // 小程序场景使用微信polyfill版本supabase-js
-      '@supabase/supabase-js': process.env.TARO_ENV === 'h5' ? '@supabase/supabase-js' : 'supabase-wechat-js'
+      '@': path.resolve(__dirname, '../src')
     },
-    defineConstants: {},
+    defineConstants: {
+      'process.env.TARO_APP_APP_ID': JSON.stringify(clientEnv.TARO_APP_APP_ID),
+      'process.env.TARO_APP_CLOUDBASE_ENV_ID': JSON.stringify(clientEnv.TARO_APP_CLOUDBASE_ENV_ID),
+      'process.env.TARO_APP_AUTH_EMAIL_DOMAIN': JSON.stringify(clientEnv.TARO_APP_AUTH_EMAIL_DOMAIN),
+      'process.env.TARO_APP_COS_PUBLIC_BASE_URL': JSON.stringify(clientEnv.TARO_APP_COS_PUBLIC_BASE_URL)
+    },
     copy: {
       patterns: [],
       options: {}
@@ -43,6 +150,8 @@ export default defineConfig<'vite'>(async (merge) => {
     compiler: {
       type: 'vite',
       vitePlugins: [
+        jsxHtmlToTaroTagsPlugin(),
+        replaceNodeProcessPlugin(),
         {
           // 通过 vite 插件加载 postcss,
           name: 'postcss-config-loader-plugin',

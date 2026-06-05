@@ -3,6 +3,7 @@ import Taro from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
 import {getUserUsageRecords} from '@/db/api'
+import {withTimeout} from '@/utils/async'
 import type {UsageRecord} from '@/db/types'
 
 // 类型标签与颜色
@@ -48,23 +49,43 @@ function UsageRecordsPage() {
   const [offset, setOffset] = useState(0)
 
   const loadFirst = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setRecords([])
+      setOffset(0)
+      setHasMore(false)
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    const data = await getUserUsageRecords(user.id, PAGE_SIZE, 0)
-    setRecords(data)
-    setOffset(data.length)
-    setHasMore(data.length === PAGE_SIZE)
-    setLoading(false)
+    try {
+      const data = await withTimeout(getUserUsageRecords(user.id, PAGE_SIZE, 0), 10000, 'usage records timeout')
+      setRecords(data)
+      setOffset(data.length)
+      setHasMore(data.length === PAGE_SIZE)
+    } catch (e) {
+      console.error('load usage records error:', e)
+      setRecords([])
+      setOffset(0)
+      setHasMore(false)
+    } finally {
+      setLoading(false)
+    }
   }, [user])
 
   const loadMore = async () => {
     if (!user || loadingMore || !hasMore) return
     setLoadingMore(true)
-    const data = await getUserUsageRecords(user.id, PAGE_SIZE, offset)
-    setRecords((prev) => [...prev, ...data])
-    setOffset((prev) => prev + data.length)
-    setHasMore(data.length === PAGE_SIZE)
-    setLoadingMore(false)
+    try {
+      const data = await withTimeout(getUserUsageRecords(user.id, PAGE_SIZE, offset), 10000, 'more usage records timeout')
+      setRecords((prev) => [...prev, ...data])
+      setOffset((prev) => prev + data.length)
+      setHasMore(data.length === PAGE_SIZE)
+    } catch (e) {
+      console.error('load more usage records error:', e)
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   useEffect(() => {

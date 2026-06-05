@@ -37,6 +37,96 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const COS_PUBLIC_BASE_URL = Deno.env.get('COS_PUBLIC_BASE_URL') || 'https://wechat-app-1409532217.cos-website.ap-beijing.myqcloud.com'
+
+function toHex(buf: Uint8Array): string {
+  return Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function hmacSHA1Bytes(key: string | Uint8Array, data: string): Promise<Uint8Array> {
+  const keyData = typeof key === 'string' ? new TextEncoder().encode(key) : key
+  const ck = await crypto.subtle.importKey('raw', keyData, {name: 'HMAC', hash: 'SHA-1'}, false, ['sign'])
+  return new Uint8Array(await crypto.subtle.sign('HMAC', ck, new TextEncoder().encode(data)))
+}
+
+async function sha1Hex(data: string): Promise<string> {
+  const h = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(data))
+  return toHex(new Uint8Array(h))
+}
+
+async function cosAuth(
+  secretId: string,
+  secretKey: string,
+  method: string,
+  path: string,
+  queryParams: Record<string, string>,
+  headers: Record<string, string>,
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const endTime = now + 3600
+  const keyTime = `${now};${endTime}`
+  const signKey = await hmacSHA1Bytes(secretKey, keyTime)
+  const sortedParamKeys = Object.keys(queryParams).map((k) => k.toLowerCase()).sort()
+  const sortedParamStr = sortedParamKeys.map((k) => `${k}=${encodeURIComponent(queryParams[k])}`).join('&')
+  const sortedHeaderKeys = Object.keys(headers).map((k) => k.toLowerCase()).sort()
+  const sortedHeaderStr = sortedHeaderKeys.map((k) => `${k}=${encodeURIComponent(headers[k])}`).join('&')
+  const httpString = `${method.toLowerCase()}\n${path}\n${sortedParamStr}\n${sortedHeaderStr}\n`
+  const stringToSign = `sha1\n${keyTime}\n${await sha1Hex(httpString)}\n`
+  const signature = toHex(await hmacSHA1Bytes(signKey, stringToSign))
+  return [
+    'q-sign-algorithm=sha1',
+    `q-ak=${secretId}`,
+    `q-sign-time=${keyTime}`,
+    `q-key-time=${keyTime}`,
+    `q-header-list=${sortedHeaderKeys.join(";")}`,
+    `q-url-param-list=${sortedParamKeys.join(";")}`,
+    `q-signature=${signature}`,
+  ].join('&')
+}
+
+function cosPublicUrl(key: string): string {
+  return `${COS_PUBLIC_BASE_URL.replace(/\/$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}`
+}
+
+async function writePackageManifestToCos(params: {
+  userSpaceId: string
+  materialId: string
+  result: Record<string, Record<string, unknown>>
+  taskType: string
+  sourceMode: string
+  attachments: AttachmentMeta[]
+}): Promise<{key: string; url: string} | null> {
+  const secretId = Deno.env.get('TENCENT_SECRET_ID')
+  const secretKey = Deno.env.get('TENCENT_SECRET_KEY')
+  const bucket = Deno.env.get('COS_BUCKET')
+  const region = Deno.env.get('COS_REGION')
+  if (!secretId || !secretKey || !bucket || !region) return null
+
+  const host = `${bucket}.cos.${region}.myqcloud.com`
+  const key = `users/${params.userSpaceId}/outputs/${params.materialId}/manifest.json`
+  const encodedPath = '/' + key.split('/').map(encodeURIComponent).join('/')
+  const body = JSON.stringify({
+    type: 'material_package',
+    task_type: params.taskType,
+    source_mode: params.sourceMode,
+    generated_at: new Date().toISOString(),
+    source_assets: params.attachments,
+    result: params.result,
+  }, null, 2)
+  const headers = {'content-type': 'application/json', host}
+  const auth = await cosAuth(secretId, secretKey, 'PUT', encodedPath, {}, headers)
+  const resp = await fetch(`https://${host}${encodedPath}`, {
+    method: 'PUT',
+    headers: {Host: host, 'Content-Type': 'application/json', Authorization: auth},
+    body,
+  })
+  if (!resp.ok) {
+    console.error('[guard] COS manifest write failed:', resp.status, await resp.text().catch(() => ''))
+    return null
+  }
+  return {key, url: cosPublicUrl(key)}
+}
+
 // ── 统一安全转向话术 ──────────────────────────────────────────────
 const SAFE_REDIRECT_MSG = '当前 Luna 不支持账号登录、Cookie、代理、后台数据采集、自动发布或自动推送。你可以上传素材，或输入内容方向，我可以基于你提供的素材、公开信息和平台内容规律，帮你生成多平台素材包和投放建议。'
 
@@ -226,7 +316,21 @@ function buildPackagePrompt(taskType: TaskType, body: Record<string, unknown>): 
     return `你是 Luna，专业的多平台内容策略师。\n\n用户提供的素材：\n${materialText || '（用户上传了附件素材）'}${imageNote}${fileNote}\n\n目标平台：${platformList}\n投放目标：${goal}\n\n请为每个目标平台分别生成完整的内容方案。\n${PLATFORM_OUTPUT_SPEC}`
   }
   if (taskType === 'direction_package') {
-    return `你是 Luna，专业的多平台内容策略师，擅长热点趋势分析。\n\n用户的行业方向：${industry}\n目标平台：${platformList}\n投放目标：${goal}\n\n请基于该行业公开信息、平台内容规律和当前热点趋势生成多平台内容素材包。\n${PLATFORM_OUTPUT_SPEC}`
+    return `你是 Luna，专业的多平台内容策略师，擅长公开信息收集、热点预测和热点追踪。
+
+用户只提供了定位和方向，没有上传素材。
+行业方向：${industry}
+目标平台：${platformList}
+投放目标：${goal}
+
+请先基于公开信息模拟完成以下流程：
+1. 信息收集：梳理该方向的公开内容、用户痛点、典型场景和竞品表达。
+2. 热点预测：判断未来 7-14 天可借势的热点、节日、话题和内容角度。
+3. 热点追踪：给出每个平台可追踪的关键词、话题标签和内容样式。
+4. 素材组织：把收集到的方向和热点转化为多平台素材包。
+
+最终只输出素材包 JSON，不要输出流程解释。
+${PLATFORM_OUTPUT_SPEC}`
   }
   if (taskType === 'copy_rewrite') {
     return `你是 Luna，专业文案优化师。请对以下内容进行多平台文案改写：\n\n${materialText}\n\n目标平台：${platformList}\n\n${PLATFORM_OUTPUT_SPEC}`
@@ -440,10 +544,18 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const body = await req.json() as Record<string, unknown>
-    const userId = body.user_id as string | undefined
+    const requestedUserId = body.user_id as string | undefined
+    const authHeader = req.headers.get('Authorization') || `Bearer ${serviceRoleKey}`
+    const authToken = authHeader.replace(/^Bearer\s+/i, '')
+    let authUserId: string | null = null
+    if (authToken && authToken !== serviceRoleKey) {
+      const {data: {user}, error: authError} = await supabase.auth.getUser(authToken)
+      if (authError || !user) return Response.json({error: 'Unauthorized'}, {status: 401, headers: CORS})
+      authUserId = user.id
+    }
+    const userId = authUserId || requestedUserId
     const platforms: string[] = (body.platforms as string[]) || ['小红书', '抖音', '视频号', '公众号']
     const history = (body.history as Array<{role: string; content: string}>) || []
-    const authHeader = req.headers.get('Authorization') || `Bearer ${serviceRoleKey}`
 
     // ── 附件 metadata：支持新格式 attachments[] 和旧格式字段两种 ─
     let attachments: AttachmentMeta[] = []
@@ -626,10 +738,18 @@ Deno.serve(async (req: Request) => {
 
     // 保存到 materials 表
     let materialId: string | null = null
+    let outputManifest: {key: string; url: string} | null = null
     if (userId) {
       const title = guardTaskType === 'direction_package'
         ? `${industry} 素材包`
         : materialText.slice(0, 30) || '素材包'
+
+      const {data: profileForCos} = await supabase
+        .from('profiles')
+        .select('openid')
+        .eq('id', userId)
+        .maybeSingle()
+      const userSpaceId = (profileForCos?.openid as string) || userId
 
       const {data: saved, error: saveErr} = await supabase
         .from('materials')
@@ -638,15 +758,47 @@ Deno.serve(async (req: Request) => {
           type: 'work',
           title,
           content: JSON.stringify(result).slice(0, 500),
-          package_config: {mode: body.mode, platforms, goal, industry, task_type: guardTaskType},
+          package_config: {mode: body.mode, platforms, goal, industry, task_type: guardTaskType, source_assets: attachments},
           package_result: result,
           source_mode: (body.mode as string) || 'chat',
         })
         .select('id')
         .maybeSingle()
 
-      if (saveErr) console.error('[guard] 保存 material 失败:', saveErr)
-      else materialId = saved?.id || null
+      if (saveErr) console.error('[guard] save material failed:', saveErr)
+      else {
+        materialId = saved?.id || null
+        if (materialId) {
+          const manifest = await writePackageManifestToCos({
+            userSpaceId,
+            materialId,
+            result,
+            taskType: guardTaskType,
+            sourceMode: (body.mode as string) || 'chat',
+            attachments,
+          }).catch((e) => {
+            console.error('[guard] write manifest failed:', e)
+            return null
+          })
+          if (manifest) {
+            outputManifest = manifest
+            await supabase
+              .from('materials')
+              .update({
+                package_config: {
+                  mode: body.mode,
+                  platforms,
+                  goal,
+                  industry,
+                  task_type: guardTaskType,
+                  source_assets: attachments,
+                  output_manifest: manifest,
+                },
+              })
+              .eq('id', materialId)
+          }
+        }
+      }
     }
 
     // 生成摘要回复
@@ -662,6 +814,7 @@ Deno.serve(async (req: Request) => {
       reply: summaryReply,
       result,
       material_id: materialId,
+      output_manifest: outputManifest,
     }, {headers: CORS})
 
   } catch (err) {
@@ -677,4 +830,3 @@ Deno.serve(async (req: Request) => {
     }, {status: 500, headers: CORS})
   }
 })
-

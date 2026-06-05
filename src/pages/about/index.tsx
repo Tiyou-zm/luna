@@ -1,12 +1,10 @@
 // @title 关于我们
 import Taro from '@tarojs/taro'
-import {Image} from '@tarojs/components'
+import {LunaAvatar} from '@/components/LunaAvatar'
 
 const APP_VERSION = '2.0.0'
 const BUILD_DATE = '2026-04-28'
 const SUPPORT_EMAIL = 'phantomfuture@126.com'
-
-const PIXEL_ART_IMG = 'https://miaoda-site-img.cdn.bcebos.com/images/baidu_image_search_fe7d3ea8-2cfc-4760-99c1-f2b7a30028f2.jpg'
 
 export default function AboutPage() {
   const handleContactEmail = () => {
@@ -20,8 +18,13 @@ export default function AboutPage() {
     <div className="min-h-screen bg-background pb-8">
       {/* ===品牌展示区=== */}
       <div className="relative overflow-hidden" style={{minHeight: '260px'}}>
-        <div className="absolute inset-0">
-          <Image src={PIXEL_ART_IMG} mode="aspectFill" style={{width: '100%', height: '260px'}} />
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: 'linear-gradient(135deg, hsl(210 95% 58% / 0.95) 0%, hsl(243 67% 52% / 0.94) 48%, hsl(263 60% 40% / 0.96) 100%), linear-gradient(rgba(255,255,255,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)',
+            backgroundSize: '100% 100%, 18px 18px, 18px 18px'
+          }}
+        >
           <div
             className="absolute inset-0"
             style={{background: 'linear-gradient(180deg, hsl(243 67% 52% / 0.7) 0%, hsl(263 60% 40% / 0.85) 60%, hsl(243 30% 12% / 0.95) 100%)'}}
@@ -38,7 +41,7 @@ export default function AboutPage() {
               boxShadow: '0 0 0 6px rgba(255,255,255,0.08), 4px 4px 0 rgba(0,0,0,0.3)'
             }}
           >
-            <div className="i-mdi-robot-excited-outline text-white" style={{fontSize: '52px'}} />
+            <LunaAvatar size={72} iconSize={42} />
           </div>
           <h1 className="font-bold text-white mb-1 text-center tracking-wider" style={{fontSize: '36px', textShadow: '3px 3px 0 rgba(0,0,0,0.4)', letterSpacing: '4px'}}>
             Luna AI

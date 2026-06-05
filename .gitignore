@@ -1,9 +1,11 @@
 dist/
+.dist-weapp-tmp/
 deploy_versions/
 .temp/
 .rn_temp/
 node_modules/
 .swc
+backups/
 
 # Logs
 logs
@@ -28,9 +30,17 @@ lerna-debug.log*
 *.code-workspace
 
 # local env files
+.env
+.env.*
+!.env.example
 .env*.local
 *.rest
 *.http
+
+# local debug screenshots
+*.png
+*.jpg
+*.jpeg
 
 # 上传沙盒服务的zip
 project.zip

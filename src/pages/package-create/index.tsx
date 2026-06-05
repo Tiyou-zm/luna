@@ -3,8 +3,20 @@ import Taro from '@tarojs/taro'
 import {Picker} from '@tarojs/components'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
-import {selectMediaFiles, uploadToSupabase} from '@/utils/upload'
-import {supabase} from '@/client/supabase'
+import {selectMediaFiles} from '@/utils/upload'
+import {uploadToCos} from '@/utils/cos'
+import {callCloudFunction} from '@/client/cloudbase'
+import {safeNavigate} from '@/utils/navigation'
+
+interface UploadedFile {
+  name: string
+  url: string
+  key: string
+  type: 'image' | 'file' | 'video'
+  mime_type: string
+  file_type: string
+  size?: number
+}
 
 // ── 常量 ─────────────────────────────────────────────────────────
 const PLATFORM_OPTIONS = ['小红书', '抖音', '视频号', '公众号']
@@ -35,7 +47,7 @@ function PackageCreatePage() {
 
   // ── 素材模式状态
   const [materialText, setMaterialText] = useState('')
-  const [uploadedFiles, setUploadedFiles] = useState<Array<{name: string; url: string}>>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [uploading, setUploading] = useState(false)
 
   // ── 方向模式状态
@@ -54,12 +66,19 @@ function PackageCreatePage() {
       const files = await selectMediaFiles({count: 3, mediaType: ['image', 'video']})
       if (!files || files.length === 0) return
       setUploading(true)
-      const results: Array<{name: string; url: string}> = []
+      const results: UploadedFile[] = []
       for (const file of files) {
-        const res = await uploadToSupabase(file, {bucket: 'chat-attachments', userId: user.id})
+        const res = await uploadToCos(file)
         if (res.success && res.data) {
-          const {data: urlData} = supabase.storage.from('chat-attachments').getPublicUrl(res.data.path)
-          results.push({name: file.name || `文件_${Date.now()}`, url: urlData.publicUrl})
+          results.push({
+            name: res.data.name || file.name || `file_${Date.now()}`,
+            url: res.data.url,
+            key: res.data.key,
+            type: res.data.type,
+            mime_type: res.data.mime_type,
+            file_type: res.data.file_type,
+            size: res.data.size,
+          })
         }
       }
       setUploadedFiles((prev) => [...prev, ...results])
@@ -78,12 +97,6 @@ function PackageCreatePage() {
 
   const handleGenerate = async () => {
     if (generating || !user) return
-
-    // 免费版额度检查
-    if (profile?.membership_level === 'free' && (profile?.ai_count || 0) >= 5) {
-      Taro.showToast({title: '免费额度已用完，请升级套餐', icon: 'none', duration: 3000})
-      return
-    }
 
     if (tab === 'material' && !materialText.trim() && uploadedFiles.length === 0) {
       Taro.showToast({title: '请输入素材内容或上传文件', icon: 'none'})
@@ -108,16 +121,20 @@ function PackageCreatePage() {
       if (tab === 'material') {
         body.material_text = materialText
         body.material_images = uploadedFiles.map((f) => f.url)
+        body.attachments = uploadedFiles.map((f) => ({
+          type: f.type,
+          file_url: f.url,
+          file_key: f.key,
+          mime_type: f.mime_type,
+          file_type: f.file_type,
+          name: f.name,
+          ...(f.size !== undefined ? {size: f.size} : {}),
+        }))
       } else {
         body.industry = industryInput
       }
 
-      const {data, error} = await supabase.functions.invoke('luna_guardian', {body})
-
-      if (error) {
-        const errMsg = await error?.context?.text?.()
-        throw new Error(errMsg || error.message)
-      }
+      const data = await callCloudFunction<any>('lunaGuardian', body)
 
       if (data?.blocked) {
         Taro.hideLoading()
@@ -138,8 +155,18 @@ function PackageCreatePage() {
 
       Taro.hideLoading()
 
-      if (data?.material_id) {
-        Taro.navigateTo({url: `/pages/package-result/index?id=${data.material_id}`})
+      if (data?.accepted || data?.job_id) {
+        Taro.showModal({
+          title: '任务已开始',
+          content: data.reply || 'Luna 已收到任务，Hermes 会在后台制作素材包。完成后会自动进入素材库。',
+          showCancel: false,
+          confirmText: '去素材库',
+          success: async () => {
+            await safeNavigate('/pages/materials/index', {replace: true, delay: 180})
+          },
+        })
+      } else if (data?.material_id) {
+        await safeNavigate(`/pages/package-result/index?id=${data.material_id}`)
       } else {
         Taro.showToast({title: '生成失败，请重试', icon: 'none'})
       }
