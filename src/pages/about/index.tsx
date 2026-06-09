@@ -1,6 +1,7 @@
 // @title 关于我们
 import Taro from '@tarojs/taro'
 import {LunaAvatar} from '@/components/LunaAvatar'
+import {openPrivacyContract} from '@/utils/privacy'
 
 const APP_VERSION = '2.0.0'
 const BUILD_DATE = '2026-04-28'
@@ -79,7 +80,14 @@ export default function AboutPage() {
           {label: '隐私政策', icon: 'i-mdi-shield-lock-outline'},
           {label: '免责声明', icon: 'i-mdi-alert-outline'}
         ].map((item, idx, arr) => (
-          <div key={item.label} className={`flex items-center gap-4 px-5 py-4 ${idx < arr.length - 1 ? 'border-b border-border' : ''}`}>
+          <div
+            key={item.label}
+            className={`flex items-center gap-4 px-5 py-4 ${idx < arr.length - 1 ? 'border-b border-border' : ''}`}
+            onClick={() => {
+              if (item.label === '隐私政策') openPrivacyContract()
+              else Taro.showToast({title: '内容整理中', icon: 'none'})
+            }}
+          >
             <div className={`${item.icon} text-primary`} style={{fontSize: '22px'}} />
             <span className="flex-1 text-2xl font-medium text-foreground">{item.label}</span>
             <div className="i-mdi-chevron-right text-muted-foreground" style={{fontSize: '20px'}} />

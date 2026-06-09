@@ -4,6 +4,7 @@ import Taro from '@tarojs/taro'
 import {LunaAvatar} from '@/components/LunaAvatar'
 import {useAuth} from '@/contexts/AuthContext'
 import {STORAGE_KEY_REDIRECT_PATH} from '@/components/RouteGuard'
+import {openPrivacyContract} from '@/utils/privacy'
 
 const TAB_PAGES = [
   '/pages/chat/index',
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [wechatLoading, setWechatLoading] = useState(false)
@@ -70,7 +72,7 @@ export default function LoginPage() {
       } else {
         const {error} = await signInWithUsername(username, password)
         if (error) {
-          Taro.showToast({title: '用户名或密码错误', icon: 'none'})
+          Taro.showToast({title: error.message || '用户名或密码错误', icon: 'none'})
         } else {
           setTimeout(() => { redirectAfterLogin() }, 200)
         }
@@ -83,6 +85,10 @@ export default function LoginPage() {
   const handleWechatLogin = async () => {
     if (!agreed) {
       Taro.showToast({title: '请先同意用户协议和隐私政策', icon: 'none'})
+      return
+    }
+    if (Taro.getEnv() !== Taro.ENV_TYPE.WEAPP) {
+      Taro.showToast({title: '微信一键登录请在小程序环境中使用', icon: 'none', duration: 3000})
       return
     }
     setWechatLoading(true)
@@ -184,14 +190,22 @@ export default function LoginPage() {
               onInput={(e) => { const ev = e as any; setUsername(ev.detail?.value ?? ev.target?.value ?? '') }}
             />
           </div>
-          <div className="border-2 border-input rounded-xl px-4 py-3 bg-card overflow-hidden">
+          <div className="border-2 border-input rounded-xl px-4 py-3 bg-card overflow-hidden flex items-center gap-2">
             <input
-              className="w-full text-2xl text-foreground bg-transparent outline-none"
-              type="password"
+              className="flex-1 text-2xl text-foreground bg-transparent outline-none"
+              type={showPassword ? 'text' : 'password'}
               placeholder="密码（至少6位）"
               value={password}
               onInput={(e) => { const ev = e as any; setPassword(ev.detail?.value ?? ev.target?.value ?? '') }}
             />
+            <button
+              type="button"
+              className="w-9 h-9 flex items-center justify-center text-muted-foreground"
+              style={{padding: 0, border: 0, background: 'transparent', lineHeight: 1}}
+              onClick={() => setShowPassword((value) => !value)}
+            >
+              <div className={showPassword ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'} style={{fontSize: '22px'}} />
+            </button>
           </div>
         </div>
 
@@ -200,7 +214,18 @@ export default function LoginPage() {
           <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition ${agreed ? 'bg-primary border-primary' : 'border-border bg-background'}`}>
             {agreed && <div className="i-mdi-check text-white" style={{fontSize: '16px'}} />}
           </div>
-          <span className="text-xl text-muted-foreground">我已阅读并同意《用户协议》和《隐私政策》</span>
+          <span className="text-xl text-muted-foreground">
+            我已阅读并同意《用户协议》和
+            <span
+              className="text-primary"
+              onClick={(event) => {
+                event.stopPropagation()
+                openPrivacyContract()
+              }}
+            >
+              《隐私政策》
+            </span>
+          </span>
         </div>
 
         {/* 主登录按钮 */}

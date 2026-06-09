@@ -1,5 +1,6 @@
 import Taro from "@tarojs/taro";
 import {getCloudTempUrl, uploadCloudFile} from '@/client/cloudbase'
+import {ensurePrivacyAuthorized} from '@/utils/privacy'
 
 /**
  * MIME type mappings for common file extensions
@@ -139,6 +140,9 @@ export async function selectMediaFiles(
   } = options
 
   try {
+    const authorized = await ensurePrivacyAuthorized('选择并上传图片或视频素材')
+    if (!authorized) return []
+
     const result = await Taro.chooseMedia({
       count,
       mediaType,
@@ -211,6 +215,9 @@ export async function selectMessageFile(
     }
 
     // MiniProgram environment: use chooseMessageFile API
+    const authorized = await ensurePrivacyAuthorized('选择并上传文件素材')
+    if (!authorized) return null
+
     const result = await Taro.chooseMessageFile({
       count,
       type,

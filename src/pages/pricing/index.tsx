@@ -20,6 +20,24 @@ function formatPlanQuota(value: number | null | undefined, unit: string) {
   return `${value}${unit}/月`
 }
 
+function canUseVirtualPayment() {
+  const wxApi = typeof wx !== 'undefined' ? (wx as any) : null
+  if (!wxApi?.requestVirtualPayment) return false
+  if (wxApi.canIUse) return wxApi.canIUse('requestVirtualPayment')
+  return true
+}
+
+function requestVirtualPayment(params: Record<string, any>) {
+  const wxApi = typeof wx !== 'undefined' ? (wx as any) : null
+  return new Promise<void>((resolve, reject) => {
+    wxApi.requestVirtualPayment({
+      ...params,
+      success: () => resolve(),
+      fail: (err: any) => reject(err),
+    })
+  })
+}
+
 function PricingPage() {
   const {user, profile, refreshProfile} = useAuth()
   const [selectedPlan, setSelectedPlan] = useState<PlanOption | null>(null)
@@ -28,7 +46,18 @@ function PricingPage() {
   const currentLevel = (profile?.membership_level as string) || 'free'
 
   const handlePurchase = async () => {
-    if (!selectedPlan || paying || !user) return
+    if (!selectedPlan || paying) return
+    if (!user) {
+      Taro.showModal({
+        title: '请先登录',
+        content: '开通会员需要先登录账号。',
+        confirmText: '去登录',
+        success: (res) => {
+          if (res.confirm) Taro.navigateTo({url: '/pages/login/index'})
+        },
+      })
+      return
+    }
     if (selectedPlan.id === 'free') {
       Taro.showToast({title: '当前已是免费版', icon: 'none'})
       return
@@ -42,54 +71,55 @@ function PricingPage() {
 
     setPaying(true)
     try {
-      const openid = profile?.openid as string | null
-      if (!openid) { Taro.showToast({title: '获取微信openid失败，请重试', icon: 'none'}); return }
-
-      const data = await callCloudFunction<any>('createWechatPayment', {
-        openid,
+      if (!canUseVirtualPayment()) {
+        Taro.showToast({title: '当前微信版本暂不支持虚拟支付，请升级微信后重试', icon: 'none', duration: 3000})
+        return
+      }
+      const loginRes = await Taro.login()
+      if (!loginRes.code) {
+        Taro.showToast({title: '获取登录凭证失败，请重试', icon: 'none'})
+        return
+      }
+      const data = await callCloudFunction<any>('createVirtualPayment', {
         planName: selectedPlan.name,
         planLevel: selectedPlan.id,
-        amount: selectedPlan.price,
+        goodsPrice: Math.round(selectedPlan.price * 100),
+        loginCode: loginRes.code,
       })
       if (!data?.success) {
         Taro.showToast({title: data?.error || '创建订单失败', icon: 'none', duration: 3000})
         return
       }
       const {paymentParams, orderNo} = data
-      await Taro.requestPayment({
-        timeStamp: paymentParams.timeStamp,
-        nonceStr: paymentParams.nonceStr,
-        package: paymentParams.package,
-        signType: paymentParams.signType,
-        paySign: paymentParams.paySign,
-        success: async () => {
-          Taro.showToast({title: '支付确认中...', icon: 'loading', duration: 10000})
-          await callCloudFunction('createWechatPayment', {action: 'confirm', orderNo}).catch((error) => {
-            console.warn('confirm plan payment failed:', error)
-          })
-          let attempts = 0
-          const poll = async () => {
-            attempts++
-            const orderRow = await callDbApi<any>('getOrderStatus', {orderNo})
-            if (orderRow?.status === 'paid' || orderRow?.status === 'completed') {
-              Taro.hideToast(); await refreshProfile()
-              Taro.showToast({title: '套餐开通成功！', icon: 'success', duration: 3000})
-            } else if (attempts < 30) {
-              setTimeout(poll, 2000)
-            } else {
-              Taro.hideToast(); await refreshProfile()
-              Taro.showToast({title: '支付成功，套餐生效中，请稍后刷新', icon: 'none', duration: 3000})
-            }
-          }
-          setTimeout(poll, 2000)
-        },
-        fail: (err) => {
-          if (err.errMsg?.includes('cancel')) Taro.showToast({title: '已取消支付', icon: 'none'})
-          else Taro.showToast({title: '支付失败，请重试', icon: 'none'})
-        }
+      await requestVirtualPayment({
+        signData: paymentParams.signData,
+        paySig: paymentParams.paySig,
+        signature: paymentParams.signature,
+        mode: paymentParams.mode,
       })
+      Taro.showToast({title: '支付确认中...', icon: 'loading', duration: 10000})
+      await callCloudFunction('createVirtualPayment', {action: 'confirm', orderNo}).catch((error) => {
+        console.warn('confirm virtual plan payment failed:', error)
+      })
+      let attempts = 0
+      const poll = async () => {
+        attempts++
+        const orderRow = await callDbApi<any>('getOrderStatus', {orderNo})
+        if (orderRow?.status === 'paid' || orderRow?.status === 'completed') {
+          Taro.hideToast(); await refreshProfile()
+          Taro.showToast({title: '套餐开通成功！', icon: 'success', duration: 3000})
+        } else if (attempts < 30) {
+          setTimeout(poll, 2000)
+        } else {
+          Taro.hideToast(); await refreshProfile()
+          Taro.showToast({title: '支付成功，套餐生效中，请稍后刷新', icon: 'none', duration: 3000})
+        }
+      }
+      setTimeout(poll, 2000)
     } catch (err: unknown) {
-      Taro.showToast({title: (err instanceof Error ? err.message : '操作失败').slice(0, 20), icon: 'none'})
+      const message = err && typeof err === 'object' && 'errMsg' in err ? String((err as any).errMsg) : (err instanceof Error ? err.message : '操作失败')
+      if (message.includes('cancel') || message.includes('-2')) Taro.showToast({title: '已取消支付', icon: 'none'})
+      else Taro.showToast({title: message.slice(0, 20), icon: 'none'})
     } finally {
       setPaying(false)
     }
@@ -214,17 +244,6 @@ function PricingPage() {
 
       {/* 固定底部购买按钮 */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t-2 border-border px-4 py-4">
-        <div
-          className="flex items-center justify-between px-4 py-3 mb-3 border border-border bg-card rounded-xl"
-          onClick={() => Taro.navigateTo({url: '/pages/compute-recharge/index'})}
-        >
-          <div className="flex items-center gap-2">
-            <div className="i-mdi-lightning-bolt text-xl text-foreground" />
-            <span className="text-xl font-bold text-foreground">单独充值算力</span>
-            <span className="text-xl text-muted-foreground">按量计费</span>
-          </div>
-          <div className="i-mdi-chevron-right text-xl text-muted-foreground" />
-        </div>
         {selectedPlan && selectedPlan.id !== 'free' ? (
           <button
             type="button"

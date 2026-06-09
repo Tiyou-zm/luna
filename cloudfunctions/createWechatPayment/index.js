@@ -5,13 +5,13 @@ const https = require('https')
 cloud.init({env: cloud.DYNAMIC_CURRENT_ENV})
 
 const db = cloud.database()
-const cmd = db.command
 
 const MCH_ID = process.env.WECHAT_MCH_ID || process.env.WECHAT_PAY_MCH_ID || ''
 const CERT_SERIAL_NO = process.env.WECHAT_PAY_SERIAL_NO || process.env.WECHAT_PAY_CERT_SERIAL_NO || ''
 const API_V3_KEY = process.env.WECHAT_PAY_API_V3_KEY || ''
 const NOTIFY_URL = process.env.WECHAT_PAY_NOTIFY_URL || ''
 const PRIVATE_KEY = normalizePrivateKey(process.env.WECHAT_PAY_PRIVATE_KEY || '')
+const FUNCTION_VERSION = 'wechat-pay-diagnose-20260605-1'
 
 function now() {
   return new Date().toISOString()
@@ -32,19 +32,84 @@ function nonce(size = 16) {
   return crypto.randomBytes(size).toString('hex')
 }
 
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+async function resolveOwnerId(event, openid) {
+  const token = String(event.authToken || '').trim()
+  if (!token) return openid
+  const res = await db.collection('auth_sessions')
+    .where({token_hash: hashToken(token), revoked_at: null})
+    .limit(1)
+    .get()
+    .catch(() => ({data: []}))
+  const session = res.data[0]
+  if (!session) return openid
+  if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) return openid
+  if (session.login_openid && openid && session.login_openid !== openid) return openid
+  return session.user_id || openid
+}
+
 function orderNo(prefix = 'LUNA') {
   return `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 }
 
+async function ensureCollection(name) {
+  try {
+    await db.collection(name).limit(1).get()
+  } catch (error) {
+    if (!String(error?.message || error).includes('collection not exists')) throw error
+    await db.createCollection(name).catch(() => null)
+  }
+}
+
 function assertPayConfig() {
+  const missing = getMissingPayConfig()
+  if (missing.length) {
+    throw new Error(`微信支付缺少配置：${missing.join(', ')}`)
+  }
+  validatePrivateKey()
+}
+
+function getMissingPayConfig() {
   const missing = []
   if (!MCH_ID) missing.push('WECHAT_MCH_ID')
   if (!CERT_SERIAL_NO) missing.push('WECHAT_PAY_SERIAL_NO')
   if (!PRIVATE_KEY) missing.push('WECHAT_PAY_PRIVATE_KEY')
   if (!API_V3_KEY) missing.push('WECHAT_PAY_API_V3_KEY')
   if (!NOTIFY_URL) missing.push('WECHAT_PAY_NOTIFY_URL')
-  if (missing.length) {
-    throw new Error(`微信支付缺少配置：${missing.join(', ')}`)
+  return missing
+}
+
+function validatePrivateKey() {
+  try {
+    crypto.createPrivateKey(PRIVATE_KEY)
+    return true
+  } catch {
+    throw new Error('WECHAT_PAY_PRIVATE_KEY 格式无效，请使用商户 API 证书私钥 PEM 或 base64 后的 PEM')
+  }
+}
+
+function diagnosePayConfig(openid, appid) {
+  const missing = getMissingPayConfig()
+  let privateKeyValid = false
+  if (PRIVATE_KEY) {
+    try {
+      privateKeyValid = validatePrivateKey()
+    } catch {}
+  }
+  return {
+    version: FUNCTION_VERSION,
+    hasOpenid: Boolean(openid),
+    hasAppid: Boolean(appid),
+    hasMchId: Boolean(MCH_ID),
+    hasSerialNo: Boolean(CERT_SERIAL_NO),
+    hasPrivateKey: Boolean(PRIVATE_KEY),
+    privateKeyValid,
+    hasApiV3Key: Boolean(API_V3_KEY),
+    hasNotifyUrl: Boolean(NOTIFY_URL),
+    missing,
   }
 }
 
@@ -75,10 +140,12 @@ function requestWechatPay(method, pathWithQuery, payload) {
       headers: {
         authorization: auth.authorization,
         accept: 'application/json',
+        'accept-language': 'zh-CN,zh;q=0.9',
         'content-type': 'application/json',
+        'user-agent': 'LunaMiniProgram/1.0 CloudBaseFunction createWechatPayment',
         ...(body ? {'content-length': Buffer.byteLength(body)} : {}),
       },
-      timeout: 20000,
+      timeout: 120000,
     }, (res) => {
       const chunks = []
       res.on('data', (chunk) => chunks.push(chunk))
@@ -126,15 +193,15 @@ function planEntitlements(level) {
   return map[level] || map.trial
 }
 
-async function findPaymentRow(collection, openid, outTradeNo) {
-  const res = await db.collection(collection).where({order_no: outTradeNo, user_id: openid}).limit(1).get()
+async function findPaymentRow(collection, userId, outTradeNo) {
+  const res = await db.collection(collection).where({order_no: outTradeNo, user_id: userId}).limit(1).get()
   return res.data[0] || null
 }
 
-async function applyPaidResult(openid, outTradeNo, transaction) {
+async function applyPaidResult(userId, outTradeNo, transaction) {
   const transactionId = transaction.transaction_id || null
   const paidAt = now()
-  const order = await findPaymentRow('orders', openid, outTradeNo)
+  const order = await findPaymentRow('orders', userId, outTradeNo)
   if (order) {
     await db.collection('orders').doc(order._id).update({
       data: {
@@ -147,7 +214,7 @@ async function applyPaidResult(openid, outTradeNo, transaction) {
     const expires = new Date()
     expires.setDate(expires.getDate() + 30)
     const entitlements = planEntitlements(order.plan_level)
-    await db.collection('profiles').doc(openid).update({
+    await db.collection('profiles').doc(userId).update({
       data: {
         membership_level: order.plan_level,
         membership_expires: expires.toISOString(),
@@ -163,90 +230,65 @@ async function applyPaidResult(openid, outTradeNo, transaction) {
     return {kind: 'plan', row: {...order, status: 'paid', paid_at: paidAt, wechat_transaction_id: transactionId}}
   }
 
-  const recharge = await findPaymentRow('compute_recharges', openid, outTradeNo)
-  if (recharge) {
-    await db.collection('compute_recharges').doc(recharge._id).update({
-      data: {
-        status: 'paid',
-        wechat_transaction_id: transactionId,
-        paid_at: paidAt,
-        updated_at: paidAt,
-      },
-    })
-    await db.collection('profiles').doc(openid).update({
-      data: {
-        balance: cmd.inc(Number(recharge.compute_credits || recharge.amount || 0)),
-        updated_at: paidAt,
-      },
-    })
-    return {kind: 'compute', row: {...recharge, status: 'paid', paid_at: paidAt, wechat_transaction_id: transactionId}}
-  }
-
   throw new Error('未找到当前用户的支付订单')
 }
 
-async function confirmPayment(openid, appid, outTradeNo) {
+async function confirmPayment(userId, appid, outTradeNo) {
   assertPayConfig()
   const path = `/v3/pay/transactions/out-trade-no/${encodeURIComponent(outTradeNo)}?mchid=${encodeURIComponent(MCH_ID)}`
   const transaction = await requestWechatPay('GET', path)
   if (transaction.trade_state !== 'SUCCESS') {
     return {success: false, status: transaction.trade_state || 'UNKNOWN', transaction}
   }
-  const applied = await applyPaidResult(openid, outTradeNo, transaction)
+  const applied = await applyPaidResult(userId, outTradeNo, transaction)
   return {success: true, status: 'paid', transaction, ...applied}
 }
 
 exports.main = async (event = {}) => {
   const {OPENID, APPID} = cloud.getWXContext()
-  if (!OPENID) return {ok: false, error: '未获取到微信 openid'}
-
   try {
     const action = event.action || 'create'
     const appid = process.env.WECHAT_APPID || APPID
 
+    if (action === 'diagnose' || action === 'ping') {
+      return {ok: true, data: diagnosePayConfig(OPENID, appid)}
+    }
+
+    if (!OPENID) return {ok: false, error: '未获取到微信 openid，请在微信开发者工具或真机小程序环境中调用'}
+    const USER_ID = await resolveOwnerId(event, OPENID)
+
     if (action === 'confirm') {
       const outTradeNo = String(event.orderNo || '').trim()
       if (!outTradeNo) return {ok: false, error: '缺少 orderNo'}
-      const data = await confirmPayment(OPENID, appid, outTradeNo)
+      const data = await confirmPayment(USER_ID, appid, outTradeNo)
       return {ok: true, data}
     }
 
     assertPayConfig()
 
-    const type = event.type === 'compute' ? 'compute' : 'plan'
+    if (event.type === 'compute') return {ok: true, data: {success: false, error: 'Compute recharge is offline. Please buy membership.'}}
+    if (event.planLevel || event.planName) {
+      return {ok: true, data: {success: false, error: '会员购买已切换为微信虚拟支付，请使用 createVirtualPayment'}}
+    }
+    const type = 'plan'
     const amount = Number(event.amount || 0)
     if (!appid) return {ok: false, error: '缺少小程序 APPID'}
     if (amount <= 0) return {ok: false, error: '支付金额必须大于 0'}
     if (event.openid && event.openid !== OPENID) return {ok: false, error: 'openid 与当前登录用户不一致'}
 
-    const outTradeNo = orderNo(type === 'compute' ? 'LUNAC' : 'LUNAP')
+    const outTradeNo = orderNo('LUNAP')
     const total = Math.round(amount * 100)
-    const description = String(event.planName || (type === 'compute' ? 'Luna 算力充值' : 'Luna 套餐购买')).slice(0, 120)
+    const description = String(event.planName || 'Luna membership').slice(0, 120)
     const createdAt = now()
-
-    if (type === 'compute') {
-      const credits = Number(event.computeCredits || Math.round(amount * 1.3))
-      await db.collection('compute_recharges').add({
-        data: {
-          user_id: OPENID,
-          order_no: outTradeNo,
-          amount,
-          compute_credits: credits,
-          status: 'pending',
-          wechat_transaction_id: null,
-          paid_at: null,
-          created_at: createdAt,
-          updated_at: createdAt,
-        },
-      })
-    } else {
-      await db.collection('orders').add({
-        data: {
-          user_id: OPENID,
+    await ensureCollection('orders')
+    await db.collection('orders').add({
+      data: {
+          user_id: USER_ID,
+          payer_openid: OPENID,
           openid: OPENID,
           order_no: outTradeNo,
           plan_name: description,
-          plan_level: event.planLevel || 'graphic',
+          plan_level: event.planLevel || 'trial',
           status: 'pending',
           amount,
           wechat_transaction_id: null,
@@ -254,9 +296,8 @@ exports.main = async (event = {}) => {
           paid_at: null,
           created_at: createdAt,
           updated_at: createdAt,
-        },
-      })
-    }
+      },
+    })
 
     const transaction = await requestWechatPay('POST', '/v3/pay/transactions/jsapi', {
       appid,

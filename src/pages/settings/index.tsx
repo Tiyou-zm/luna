@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react'
 import Taro from '@tarojs/taro'
 import {withRouteGuard} from '@/components/RouteGuard'
+import {openPrivacyContract} from '@/utils/privacy'
 
 const STORAGE_KEY = 'luna_settings'
 
@@ -97,6 +98,13 @@ function SettingsPage() {
               <ToggleSwitch value={settings[item.key]} onChange={(v) => update(item.key, v)} />
             </div>
           ))}
+          <div className="flex items-center gap-4 px-5 py-4 border-t border-border" onClick={openPrivacyContract}>
+            <div className="flex-1">
+              <p className="text-2xl font-medium text-foreground">用户隐私保护指引</p>
+              <p className="text-xl text-muted-foreground">查看微信官方隐私政策</p>
+            </div>
+            <div className="i-mdi-chevron-right text-muted-foreground" style={{fontSize: '20px'}} />
+          </div>
         </div>
       </div>
 
