@@ -58,6 +58,7 @@ export interface Profile {
   membership_expires: string | null
   balance: number
   ai_count: number
+  free_chat_count?: number
   video_seconds_used: number
   graphic_count_used: number
   usage_period_start: string | null
@@ -143,6 +144,8 @@ export interface PackageConfig {
   provider?: string
   generation_job_id?: string
   repair_used?: boolean
+  asset_warning?: string | null
+  asset_counts?: Record<string, number>
 }
 
 export interface Material {
@@ -166,6 +169,7 @@ export interface Material {
   content_strategy?: Record<string, unknown> | null
   assets?: Record<string, unknown> | null
   package_archive?: Record<string, unknown> | null
+  asset_warning?: string | null
   qa?: Record<string, unknown> | null
   final_checks?: Record<string, unknown> | null
   created_at: string
@@ -219,19 +223,6 @@ export interface Announcement {
   content: string
   type: string
   is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface ComputeRecharge {
-  id: string
-  user_id: string
-  order_no: string
-  amount: number
-  compute_credits: number
-  status: string
-  wechat_transaction_id: string | null
-  paid_at: string | null
   created_at: string
   updated_at: string
 }
@@ -310,14 +301,14 @@ export const PLANS: PlanOption[] = [
   {
     id: 'trial',
     name: '试用版',
-    price: 6.66,
+    price: 19.9,
     packageCount: 999999,
-    trendCount: 999999,
+    trendCount: null,
     imageCount: 999999,
     graphicCount: 999999,
     videoSeconds: 999999,
     videoCount: null,
-    highlight: '一次完整素材包试用，含文案、脚本、投放建议与素材库归档',
+    highlight: '一次完整素材包试用，含文案、视频脚本、投放建议与素材库归档',
     icon: 'i-mdi-rocket-launch-outline'
   },
   {

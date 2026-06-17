@@ -9,6 +9,7 @@
     "once": "WORKER_ONCE=true node index.cjs"
   },
   "dependencies": {
-    "@cloudbase/node-sdk": "^3.18.1"
+    "@cloudbase/node-sdk": "^3.18.1",
+    "adm-zip": "^0.5.17"
   }
 }

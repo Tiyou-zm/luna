@@ -222,7 +222,7 @@ function WorkbenchPage() {
     if (user) return true
     Taro.showModal({
       title: '需要登录',
-      content: '登录后可以生成内容、上传素材，并保存到你的素材库。',
+      content: '登录后可以生成内容、上传文件，并保存到你的素材库。',
       confirmText: '去登录',
       cancelText: '先看看',
       success: ({confirm}) => {
@@ -247,7 +247,7 @@ function WorkbenchPage() {
     // 只有附件没有文字时，自动补充描述让 Luna 知道有素材要处理
     const effectiveText = text || (isImageAttach
       ? `请根据这张图片帮我生成多平台内容`
-      : `请根据上传的文件「${attachment?.name ?? '素材文件'}」帮我生成多平台内容`)
+      : `请根据上传的文件「${attachment?.name ?? '文件资产'}」帮我生成多平台内容`)
 
     setInputText('')
     setPendingAttachment(null)
@@ -490,7 +490,7 @@ function WorkbenchPage() {
         }
         const fileKey = result.data.key
         const publicUrl = result.data.url
-        const fileName = (file as MiniProgramFileInput).name || '素材文件'
+        const fileName = (file as MiniProgramFileInput).name || '文件资产'
         const ext = fileName.split('.').pop()?.toLowerCase() || 'file'
         const meta: AttachmentMeta = {
           type: 'file',

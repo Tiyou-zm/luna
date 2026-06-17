@@ -4,7 +4,6 @@ const crypto = require('crypto')
 cloud.init({env: cloud.DYNAMIC_CURRENT_ENV})
 
 const db = cloud.database()
-const cmd = db.command
 const API_V3_KEY = process.env.WECHAT_PAY_API_V3_KEY || ''
 
 function now() {
@@ -77,17 +76,6 @@ async function applyPaid(transaction) {
         video_seconds_quota: entitlements.video_seconds,
         updated_at: now(),
       },
-    })
-    return true
-  }
-
-  const recharge = await findByOrderNo('compute_recharges', outTradeNo)
-  if (recharge) {
-    await db.collection('compute_recharges').doc(recharge._id).update({
-      data: {status: 'paid', wechat_transaction_id: transactionId, paid_at: paidAt, updated_at: now()},
-    })
-    await db.collection('profiles').doc(recharge.user_id).update({
-      data: {balance: cmd.inc(Number(recharge.compute_credits || recharge.amount || 0)), updated_at: now()},
     })
     return true
   }

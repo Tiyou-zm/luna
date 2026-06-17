@@ -10,6 +10,8 @@ let initialized = false
 export interface AppUser {
   id: string
   openid?: string | null
+  accountType?: 'manual' | 'wechat'
+  sessionToken?: string | null
 }
 
 export interface CloudResponse<T = unknown> {
@@ -40,7 +42,12 @@ export async function callCloudFunction<T = unknown>(
   if (!cloud?.callFunction) {
     throw new Error('当前环境不支持微信云开发，请在微信开发者工具或真机中运行')
   }
+  const user = getLocalUser()
   const action = typeof data.action === 'string' ? data.action : ''
+  const isAuthAction = name === 'dbApi' && ['login', 'register', 'ensureProfile', 'ping', 'authDebug'].includes(action)
+  const payload = (!isAuthAction && user?.sessionToken && !data.authToken)
+    ? {...data, authToken: user.sessionToken}
+    : data
   const startedAt = Date.now()
   setLastCloudCall({name, action, env: CLOUDBASE_ENV_ID, status: 'start'})
   console.info('[CloudBase] call start', {name, action, env: CLOUDBASE_ENV_ID})
@@ -48,7 +55,7 @@ export async function callCloudFunction<T = unknown>(
   try {
     res = await cloud.callFunction<CloudResponse<T> | T>({
       name,
-      data,
+      data: payload,
       config: {env: CLOUDBASE_ENV_ID},
     } as any)
   } catch (error) {
@@ -71,6 +78,10 @@ export async function callCloudFunction<T = unknown>(
 
 export async function ensureCloudProfile(metadata: Partial<Profile> = {}) {
   return callCloudFunction<{user: AppUser; profile: Profile}>('dbApi', {action: 'ensureProfile', metadata})
+}
+
+export async function getActiveCloudProfile() {
+  return callCloudFunction<Profile>('dbApi', {action: 'getProfile'})
 }
 
 export async function authCloudAccount(action: 'login' | 'register', username: string, password: string) {

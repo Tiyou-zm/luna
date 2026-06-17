@@ -19,6 +19,20 @@ function joinUrl(baseUrl, path) {
   return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 }
 
+function safeSessionPart(value, fallback = 'default') {
+  const text = String(value || fallback).trim()
+  const safe = text
+    .replace(/[^a-zA-Z0-9_.:-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 96)
+  return safe || fallback
+}
+
+function buildCustomerSessionId(openid) {
+  return `luna_cs_${safeSessionPart(openid, 'anonymous')}`.slice(0, 180)
+}
+
 function postJson(url, payload, headers = {}) {
   return new Promise((resolve, reject) => {
     const target = new URL(url)
@@ -34,7 +48,7 @@ function postJson(url, payload, headers = {}) {
         'content-length': Buffer.byteLength(body),
         ...headers,
       },
-      timeout: 30000,
+      timeout: 120000,
     }, (res) => {
       const chunks = []
       res.on('data', (chunk) => chunks.push(chunk))
@@ -54,7 +68,7 @@ function postJson(url, payload, headers = {}) {
   })
 }
 
-async function buildReply(text, imageUrl) {
+async function buildReply(openid, text, imageUrl) {
   if (!CS_BASE_URL || !CS_API_KEY) {
     return '已收到，我已经把你的问题记录到客服消息里。客服接入密钥配置后，这里会自动给出 AI 初步回复。'
   }
@@ -74,6 +88,7 @@ async function buildReply(text, imageUrl) {
     temperature: 0.3,
   }, {
     authorization: `Bearer ${CS_API_KEY}`,
+    'X-Hermes-Session-Id': buildCustomerSessionId(openid),
   })
 
   return response?.choices?.[0]?.message?.content || response?.content || '已收到，我会继续帮你跟进这个问题。'
@@ -98,7 +113,7 @@ exports.main = async (event = {}) => {
 
   let replyText = ''
   try {
-    replyText = await buildReply(text, imageUrl)
+    replyText = await buildReply(OPENID, text, imageUrl)
   } catch (error) {
     console.error('customer service reply failed:', error)
     replyText = '已收到，我已经记录你的问题。AI 客服暂时繁忙，人工客服会继续跟进。'

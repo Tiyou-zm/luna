@@ -43,7 +43,7 @@ function TrendResearchPage() {
         </p>
         <div className="mt-4 px-3 py-2 border" style={{borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)'}}>
           <p className="text-xl" style={{color: 'rgba(255,255,255,0.5)'}}>
-            Luna 基于用户提供素材、公开信息和平台内容规律生成建议
+            Luna 基于用户提供信息、公开信息和平台内容规律生成建议
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ function TrendResearchPage() {
           <span className="text-2xl font-bold text-foreground">现在就能用</span>
         </div>
         <div className="border border-border bg-accent rounded-xl px-4 py-5 shadow-card">
-          <p className="text-xl font-bold text-white mb-2">方向热点生成素材包</p>
+          <p className="text-xl font-bold text-white mb-2">方向生成内容包</p>
           <p className="text-xl leading-relaxed mb-4" style={{color: 'rgba(255,255,255,0.7)'}}>
             输入行业方向（母婴/美妆/餐饮…），Luna 基于公开信息和平台内容规律，分析热点方向并直接生成可用的多平台素材包。
           </p>
@@ -93,7 +93,7 @@ function TrendResearchPage() {
           >
             <div className="py-4 flex items-center gap-2">
               <div className="i-mdi-creation text-xl text-white" />
-              <span>立即体验方向热点生成</span>
+              <span>立即体验方向生成</span>
             </div>
           </button>
         </div>

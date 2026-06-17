@@ -3,7 +3,6 @@ import type {
   Announcement,
   AnalyticsData,
   AnalyticsGranularity,
-  ComputeRecharge,
   Conversation,
   CsMessage,
   FinanceReport,
@@ -106,6 +105,10 @@ export async function getMaterialById(materialId: string): Promise<Material | nu
   return safeCall<Material | null>('getMaterialById', {materialId}, null)
 }
 
+export async function getMaterialChildren(materialId: string, limit = 100): Promise<Material[]> {
+  return safeCall<Material[]>('getMaterialChildren', {materialId, limit}, [])
+}
+
 export async function deleteMaterial(materialId: string): Promise<boolean> {
   return safeCall<boolean>('deleteMaterial', {materialId}, false)
 }
@@ -145,10 +148,6 @@ export async function deleteSocialAccount(accountId: string): Promise<boolean> {
 
 export async function getAnnouncements(): Promise<Announcement[]> {
   return safeCall<Announcement[]>('getAnnouncements', {}, [])
-}
-
-export async function getComputeRecharges(userId: string): Promise<ComputeRecharge[]> {
-  return safeCall<ComputeRecharge[]>('getComputeRecharges', {userId}, [])
 }
 
 export async function getFinanceReports(limit = 30): Promise<FinanceReport[]> {

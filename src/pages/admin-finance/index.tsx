@@ -66,7 +66,7 @@ function AdminFinancePage() {
         getFinanceReports(30),
         getRechargeSummary(),
         getUsageSummaryByDay(7)
-      ]), 10000, 'finance data timeout')
+      ]), 120000, 'finance data timeout')
       setLatestReport(latest)
       setReports(allReports)
       setRechargeSummary(recharge)
@@ -231,27 +231,27 @@ function AdminFinancePage() {
             </div>
           )}
 
-          {/* 充值总览 */}
+          {/* 会员收入总览 */}
           {rechargeSummary && (
             <div className="bg-card border border-border p-5">
               <div className="flex flex-row items-center gap-2 mb-4">
                 <div className="i-mdi-cash-multiple text-foreground" style={{fontSize: '22px'}} />
-                <span className="text-2xl font-bold text-foreground">用户算力充值总览</span>
+                <span className="text-2xl font-bold text-foreground">会员订单收入总览</span>
               </div>
               <div className="flex flex-row gap-3">
                 <div className="flex-1 bg-gradient-subtle p-4 flex flex-col gap-1">
-                  <span className="text-xl text-muted-foreground">累计充值总额</span>
+                  <span className="text-xl text-muted-foreground">累计会员收入</span>
                   <span className="text-2xl font-bold text-foreground">{fmtMoney(rechargeSummary.total_amount)}</span>
                   <span className="text-xl text-muted-foreground">{rechargeSummary.total_count} 笔</span>
                 </div>
                 <div className="flex-1 bg-gradient-subtle p-4 flex flex-col gap-1">
-                  <span className="text-xl text-muted-foreground">本月充值</span>
+                  <span className="text-xl text-muted-foreground">本月会员收入</span>
                   <span className="text-2xl font-bold text-foreground">{fmtMoney(rechargeSummary.this_month_amount)}</span>
                   <span className="text-xl text-muted-foreground">当月新增</span>
                 </div>
               </div>
               <p className="text-xl text-muted-foreground mt-3">
-                参考：累计用户充值 = 应向火山补充充值的最低依据
+                参考：会员订单收入用于评估模型成本覆盖能力
               </p>
             </div>
           )}

@@ -69,23 +69,20 @@ exports.main = async (event = {}) => {
   }
 
   const {reportDate, targetDate, start, end} = dayRange(event.date)
-  const [orders, recharges, usageRecords, profiles] = await Promise.all([
+  const [orders, usageRecords, profiles] = await Promise.all([
     list('orders'),
-    list('compute_recharges'),
     list('usage_records'),
     list('profiles'),
   ])
 
   const paidOrders = orders.filter((row) => ['paid', 'completed'].includes(row.status))
-  const paidRecharges = recharges.filter((row) => row.status === 'paid')
   const yesterdayOrders = paidOrders.filter((row) => inRange(row, start, end, 'paid_at'))
-  const yesterdayRecharges = paidRecharges.filter((row) => inRange(row, start, end, 'paid_at'))
   const yesterdayUsage = usageRecords.filter((row) => inRange(row, start, end))
   const last7Start = new Date(start)
   last7Start.setDate(last7Start.getDate() - 6)
   const last7Usage = usageRecords.filter((row) => row.created_at >= last7Start.toISOString() && row.created_at <= end)
 
-  const yesterdayRecharge = sum(yesterdayOrders, (row) => row.amount) + sum(yesterdayRecharges, (row) => row.amount)
+  const yesterdayRecharge = sum(yesterdayOrders, (row) => row.amount)
   const yesterdayConsumption = sum(yesterdayUsage, (row) => row.amount_deducted)
   const avgDailyConsumption = sum(last7Usage, (row) => row.amount_deducted) / 7
   const predicted3day = avgDailyConsumption * 3

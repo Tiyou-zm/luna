@@ -8,7 +8,7 @@ import type {UsageRecord} from '@/db/types'
 
 // 类型标签与颜色
 const TYPE_CONFIG: Record<string, {label: string; color: string; icon: string}> = {
-  video: {label: '视频生成', color: 'text-foreground bg-secondary border border-border', icon: 'i-mdi-video-outline'},
+  video: {label: '视频脚本生成', color: 'text-foreground bg-secondary border border-border', icon: 'i-mdi-video-outline'},
   image: {label: '图片生成', color: 'text-foreground bg-secondary border border-border', icon: 'i-mdi-image-outline'},
   audio: {label: '语音合成', color: 'text-foreground bg-secondary border border-border', icon: 'i-mdi-microphone-outline'},
   text: {label: '文字对话', color: 'text-accent bg-secondary border border-border', icon: 'i-mdi-chat-outline'},
@@ -32,7 +32,7 @@ function fmtTime(iso: string) {
 
 // 格式化数量
 function fmtQuantity(record: UsageRecord) {
-  if (record.type === 'video') return `${record.quantity}秒`
+  if (record.type === 'video') return `${record.quantity}次`
   if (record.type === 'image') return `${record.quantity}张`
   if (record.type === 'audio') return `${record.quantity}秒`
   return `${record.quantity}次`
@@ -58,7 +58,7 @@ function UsageRecordsPage() {
     }
     setLoading(true)
     try {
-      const data = await withTimeout(getUserUsageRecords(user.id, PAGE_SIZE, 0), 10000, 'usage records timeout')
+      const data = await withTimeout(getUserUsageRecords(user.id, PAGE_SIZE, 0), 120000, 'usage records timeout')
       setRecords(data)
       setOffset(data.length)
       setHasMore(data.length === PAGE_SIZE)
@@ -76,7 +76,7 @@ function UsageRecordsPage() {
     if (!user || loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
-      const data = await withTimeout(getUserUsageRecords(user.id, PAGE_SIZE, offset), 10000, 'more usage records timeout')
+      const data = await withTimeout(getUserUsageRecords(user.id, PAGE_SIZE, offset), 120000, 'more usage records timeout')
       setRecords((prev) => [...prev, ...data])
       setOffset((prev) => prev + data.length)
       setHasMore(data.length === PAGE_SIZE)
@@ -104,8 +104,8 @@ function UsageRecordsPage() {
           <div className="i-mdi-chevron-left text-white" style={{fontSize: '26px'}} />
           <span className="text-xl text-white/90">返回</span>
         </button>
-        <p className="text-3xl font-bold text-white">消耗记录</p>
-        <p className="text-xl text-white/70 mt-1">每次生成的扣费明细</p>
+        <p className="text-3xl font-bold text-white">生成记录</p>
+        <p className="text-xl text-white/70 mt-1">每次素材生成与使用明细</p>
       </div>
 
       {/* 内容区 */}
@@ -117,8 +117,8 @@ function UsageRecordsPage() {
       ) : records.length === 0 ? (
         <div className="flex flex-col items-center justify-center pt-24 gap-3">
           <div className="i-mdi-receipt-text-outline text-muted-foreground" style={{fontSize: '56px'}} />
-          <p className="text-2xl font-medium text-foreground">暂无消耗记录</p>
-          <p className="text-xl text-muted-foreground">开始使用 AI 生成功能后将在此展示</p>
+          <p className="text-2xl font-medium text-foreground">暂无生成记录</p>
+          <p className="text-xl text-muted-foreground">开始生成素材包后将在此展示</p>
         </div>
       ) : (
         <div className="px-4 mt-4 flex flex-col gap-3">
@@ -159,9 +159,8 @@ function UsageRecordsPage() {
                         -{fmtMoney(record.amount_deducted)}
                       </span>
                     )}
-                    {/* 混合扣费（配额+算力）：amount_deducted>0 且 from_plan=false → 显示"算力扣费"标签 */}
                     {!record.from_plan && record.amount_deducted > 0 && (
-                      <span className="text-xl px-2 py-0.5 bg-secondary border border-border text-foreground">算力扣费</span>
+                      <span className="text-xl px-2 py-0.5 bg-secondary border border-border text-foreground">会员外生成</span>
                     )}
                   </div>
                   {record.balance_before != null && record.balance_after != null && (
@@ -203,19 +202,19 @@ function UsageRecordsPage() {
             <div className="flex gap-3 mt-2">
               <button
                 type="button"
-                className="flex-1 py-1 border border-border flex items-center justify-center gap-2 leading-none"
-                onClick={() => Taro.navigateTo({url: '/pages/compute-recharge/index'})}
-              >
-                <div className="i-mdi-lightning-bolt text-foreground" style={{fontSize: '18px'}} />
-                <div className="py-3"><span className="text-xl font-medium text-foreground">去充值</span></div>
-              </button>
-              <button
-                type="button"
                 className="flex-1 py-1 border-2 border-border flex items-center justify-center gap-2 leading-none"
                 onClick={() => Taro.navigateTo({url: '/pages/orders/index'})}
               >
                 <div className="i-mdi-receipt-text-outline text-muted-foreground" style={{fontSize: '18px'}} />
                 <div className="py-3"><span className="text-xl font-medium text-muted-foreground">查看订单</span></div>
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-1 border border-border flex items-center justify-center gap-2 leading-none"
+                onClick={() => Taro.navigateTo({url: '/pages/pricing/index'})}
+              >
+                <div className="i-mdi-crown-outline text-foreground" style={{fontSize: '18px'}} />
+                <div className="py-3"><span className="text-xl font-medium text-foreground">查看会员</span></div>
               </button>
             </div>
           )}

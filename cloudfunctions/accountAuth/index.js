@@ -37,6 +37,7 @@ async function getOrCreateProfile(openid) {
       membership_expires: null,
       balance: 0,
       ai_count: 0,
+      free_chat_count: 0,
       bound_accounts: 0,
       phone: null,
       created_at: now(),

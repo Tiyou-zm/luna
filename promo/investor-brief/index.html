@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Luna AI 资方介绍</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #121417;
+        --muted: #667085;
+        --line: rgba(18, 20, 23, 0.12);
+        --paper: #f6f4ef;
+        --card: #fffdf8;
+        --violet: #6c5ce7;
+        --violet-deep: #31256f;
+        --mint: #35b98a;
+        --gold: #c99436;
+        --blue: #2f6fed;
+        --dark: #101415;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Inter", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+        letter-spacing: 0;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 42px clamp(24px, 5vw, 72px);
+      }
+
+      .hero {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1.08fr 0.92fr;
+        gap: clamp(32px, 5vw, 72px);
+        align-items: center;
+        color: #fff;
+        background:
+          radial-gradient(circle at 80% 18%, rgba(108, 92, 231, 0.46), transparent 28%),
+          linear-gradient(135deg, #0b0e12 0%, #111716 55%, #211a42 100%);
+        overflow: hidden;
+      }
+
+      .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 22px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .kicker::before {
+        content: "";
+        width: 44px;
+        height: 1px;
+        background: var(--gold);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 840px;
+        font-size: clamp(58px, 8vw, 118px);
+        line-height: 0.96;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: clamp(38px, 5vw, 72px);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 23px;
+        line-height: 1.25;
+      }
+
+      .lead {
+        max-width: 760px;
+        margin-top: 26px;
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 21px;
+        line-height: 1.85;
+      }
+
+      .hero-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 34px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 0 13px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .phone-stack {
+        position: relative;
+        min-height: 660px;
+      }
+
+      .phone-shot {
+        position: absolute;
+        width: min(44vw, 330px);
+        border-radius: 34px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow: 0 34px 110px rgba(0, 0, 0, 0.46);
+        background: #060708;
+      }
+
+      .phone-shot.main {
+        right: 9%;
+        top: 0;
+        width: min(46vw, 360px);
+        z-index: 3;
+      }
+
+      .phone-shot.left {
+        left: 2%;
+        bottom: 30px;
+        z-index: 2;
+        transform: rotate(-4deg);
+        opacity: 0.92;
+      }
+
+      .phone-shot.right {
+        right: 0;
+        bottom: 0;
+        z-index: 1;
+        transform: rotate(5deg);
+        opacity: 0.8;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: clamp(28px, 5vw, 68px);
+        align-items: end;
+        margin-bottom: 36px;
+      }
+
+      .section-label {
+        margin-bottom: 14px;
+        color: var(--violet);
+        font-size: 13px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .section-copy {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.9;
+      }
+
+      .grid-4,
+      .grid-3,
+      .grid-2 {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: 0 20px 60px rgba(28, 33, 38, 0.06);
+      }
+
+      .metric {
+        min-height: 158px;
+        padding: 24px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 30px;
+        color: var(--gold);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 46px;
+        line-height: 1;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.75;
+      }
+
+      .flow {
+        padding: 26px;
+      }
+
+      .flow-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .num {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--violet);
+        font-weight: 900;
+      }
+
+      .flow p,
+      .tech p,
+      .boundary p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.8;
+      }
+
+      .dark-section {
+        color: #fff;
+        background: var(--dark);
+      }
+
+      .dark-section .section-label {
+        color: var(--gold);
+      }
+
+      .dark-section .section-copy {
+        color: rgba(255, 255, 255, 0.66);
+      }
+
+      .product-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
+        align-items: start;
+      }
+
+      .product-card {
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .product-card figcaption {
+        padding: 14px;
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .architecture {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .arch-node {
+        min-height: 190px;
+        padding: 24px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .arch-node h3 {
+        margin-bottom: 12px;
+      }
+
+      .arch-node ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.9;
+      }
+
+      .arrow {
+        display: grid;
+        place-items: center;
+        color: var(--violet);
+        font-size: 34px;
+        font-weight: 900;
+      }
+
+      .tech {
+        min-height: 190px;
+        padding: 24px;
+      }
+
+      .tech .tag {
+        display: inline-flex;
+        margin-bottom: 22px;
+        color: var(--violet);
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .boundary {
+        padding: 26px;
+        border-left: 5px solid var(--mint);
+      }
+
+      .boundary.warn {
+        border-left-color: var(--gold);
+      }
+
+      .closing {
+        min-height: 82vh;
+        display: grid;
+        grid-template-columns: 1fr 0.92fr;
+        gap: clamp(32px, 5vw, 72px);
+        align-items: center;
+        background:
+          linear-gradient(120deg, rgba(255, 253, 248, 0.96), rgba(255, 253, 248, 0.82)),
+          var(--paper);
+      }
+
+      .talk-card {
+        padding: 32px;
+      }
+
+      .talk-card p {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.9;
+        white-space: pre-line;
+      }
+
+      @media (max-width: 1000px) {
+        .hero,
+        .section-head,
+        .closing {
+          grid-template-columns: 1fr;
+        }
+
+        .phone-stack {
+          min-height: 540px;
+        }
+
+        .grid-4,
+        .grid-3,
+        .grid-2,
+        .product-grid,
+        .architecture {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow {
+          transform: rotate(90deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page hero" id="shot-hero">
+      <div>
+        <div class="kicker">Creator Intelligence Workspace</div>
+        <h1>Luna AI</h1>
+        <p class="lead">
+          面向创作者、品牌主理人和私域团队的 AI 内容工作台：从素材上传、对话澄清、Hermes 长任务生成，到素材库沉淀和微信支付会员，已经形成可演示的产品闭环。
+        </p>
+        <div class="hero-badges">
+          <span class="badge">微信小程序</span>
+          <span class="badge">Hermes Agent</span>
+          <span class="badge">CloudBase 国内云</span>
+          <span class="badge">素材库资产沉淀</span>
+          <span class="badge">6.66 试用支付</span>
+        </div>
+      </div>
+      <div class="phone-stack">
+        <figure class="phone-shot main"><img src="../luna-ai/assets/chat-phone.png" alt="Luna 工作台" /></figure>
+        <figure class="phone-shot left"><img src="../luna-ai/assets/materials-phone.png" alt="素材库" /></figure>
+        <figure class="phone-shot right"><img src="../luna-ai/assets/profile-phone.png" alt="我的页面" /></figure>
+      </div>
+    </section>
+
+    <section class="page" id="shot-capability">
+      <div class="section-head">
+        <div>
+          <p class="section-label">Capability Boundary</p>
+          <h2>现在能展示的不是 Demo 页面，而是一条内容生产链路。</h2>
+        </div>
+        <p class="section-copy">
+          Luna 当前重点不是替用户“聊几句”，而是把一次内容创作拆成可执行任务：收集素材、澄清目标、启动 Hermes、等待后台 Worker 完成、回收结构化素材包，并沉淀到素材库。
+        </p>
+      </div>
+      <div class="grid-4">
+        <div class="card metric"><strong>2</strong><span>两种入口：上传素材生成，或只给定位和方向启动调研。</span></div>
+        <div class="card metric"><strong>4</strong><span>面向小红书、抖音、朋友圈、公众号输出不同表达。</span></div>
+        <div class="card metric"><strong>40m+</strong><span>Hermes 长任务不阻塞小程序，由 Worker 异步执行。</span></div>
+        <div class="card metric"><strong>¥6.66</strong><span>已接入单一试用会员，微信支付链路已真实弹起并入账。</span></div>
+      </div>
+      <div class="grid-3" style="margin-top: 18px;">
+        <article class="card flow">
+          <div class="flow-top"><span class="num">1</span><h3>已有素材</h3></div>
+          <p>用户上传图片、视频截图或资料，Luna 进入对话澄清，把产品卖点、目标平台和内容目标整理成生成任务。</p>
+        </article>
+        <article class="card flow">
+          <div class="flow-top"><span class="num">2</span><h3>只有方向</h3></div>
+          <p>用户只给行业、定位、目标人群，Hermes 可先做信息收集、热点预测和内容方向整理，再进入素材包制作。</p>
+        </article>
+        <article class="card flow">
+          <div class="flow-top"><span class="num">3</span><h3>素材包入库</h3></div>
+          <p>结果按完整包和素材文件归档，视频部分已调整为脚本、推送建议和投放逻辑，不承诺直接生成视频文件。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="page dark-section" id="shot-product">
+      <div class="section-head">
+        <div>
+          <p class="section-label">Product Surface</p>
+          <h2>小程序端已经覆盖核心使用面。</h2>
+        </div>
+        <p class="section-copy">
+          工作台负责对话和任务启动，素材库负责结果回收和资产管理，个人中心承接登录、会员和生成记录，支付页承接商业化入口。
+        </p>
+      </div>
+      <div class="product-grid">
+        <figure class="product-card">
+          <img src="../luna-ai/assets/chat-phone.png" alt="工作台" />
+          <figcaption>工作台：对话澄清与任务启动</figcaption>
+        </figure>
+        <figure class="product-card">
+          <img src="../luna-ai/assets/package-phone.png" alt="素材包创建" />
+          <figcaption>素材包创建：上传素材或输入方向</figcaption>
+        </figure>
+        <figure class="product-card">
+          <img src="../luna-ai/assets/materials-phone.png" alt="素材库" />
+          <figcaption>素材库：完整包与素材文件归档</figcaption>
+        </figure>
+        <figure class="product-card">
+          <img src="../luna-ai/assets/login-phone.png" alt="登录" />
+          <figcaption>登录：自建账号与微信一键登录</figcaption>
+        </figure>
+        <figure class="product-card">
+          <img src="../luna-ai/assets/profile-phone.png" alt="个人中心" />
+          <figcaption>我的：会员状态、生成记录、账户设置</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="page" id="shot-tech">
+      <div class="section-head">
+        <div>
+          <p class="section-label">Technical Highlights</p>
+          <h2>技术上选择了更适合国内小程序上线的架构。</h2>
+        </div>
+        <p class="section-copy">
+          已从海外 BaaS 思路切换到 CloudBase 国内云，前端只负责轻交互，长任务交给远端 Worker，支付和账号数据留在云函数侧，避免把密钥和长耗时任务暴露在小程序端。
+        </p>
+      </div>
+      <div class="architecture">
+        <div class="arch-node">
+          <h3>微信小程序前端</h3>
+          <ul>
+            <li>Taro + React</li>
+            <li>工作台、素材库、会员、登录</li>
+            <li>安全构建与按需注入</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="arch-node">
+          <h3>CloudBase 后端</h3>
+          <ul>
+            <li>dbApi / lunaGuardian</li>
+            <li>profiles、materials、orders</li>
+            <li>MiniMax 安保层与账号隔离</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="arch-node">
+          <h3>Hermes Worker</h3>
+          <ul>
+            <li>40 分钟级任务异步执行</li>
+            <li>解析 material_package v2</li>
+            <li>异常输出自动修复与回写</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid-3" style="margin-top: 18px;">
+        <article class="card tech"><span class="tag">Account</span><h3>账号体系</h3><p>支持自建账号和微信一键登录分离，业务数据按用户 ID 归属，避免新注册账号污染微信超级账户。</p></article>
+        <article class="card tech"><span class="tag">Payment</span><h3>微信支付</h3><p>6.66 试用会员已接入 JSAPI 支付，订单、回调、确认、会员生效进入云数据库链路。</p></article>
+        <article class="card tech"><span class="tag">Reliability</span><h3>稳定性</h3><p>长任务不再卡在小程序云函数超时里，后台 Worker 接管生成，前端提示已受理并引导去素材库查看。</p></article>
+      </div>
+    </section>
+
+    <section class="page closing" id="shot-close">
+      <div>
+        <p class="section-label">Investor Talk Track</p>
+        <h2>Luna 想做的是创作者每天打开的内容资产入口。</h2>
+      </div>
+      <div class="card talk-card">
+        <p>一句话介绍：Luna AI 是一个面向中小团队和创作者的 AI 内容生产工作台，把“想法或素材”变成“可发布、可管理、可复用的多平台内容包”。
+
+目前边界：已经能演示账号、素材上传、对话澄清、异步生成任务、素材库归档、微信支付试用会员；视频能力当前定位为脚本、推送建议和投放分析，不承诺直接产出成片。
+
+技术亮点：国内 CloudBase 架构、Hermes 长任务 Worker、结构化素材包 v2、MiniMax 安保层、微信支付闭环和用户级素材归属。
+
+下一阶段：强化真实素材包成功率、完善素材库检索/复用、打通更稳定的 COS 文件链路，并把定制化服务作为高客单价入口。</p>
+      </div>
+    </section>
+    <script>
+      (() => {
+        const id = window.location.hash.slice(1);
+        if (!id || !id.startsWith("shot-")) return;
+        const target = document.getElementById(id);
+        if (!target) return;
+        document.body.innerHTML = "";
+        document.body.appendChild(target.cloneNode(true));
+      })();
+    </script>
+  </body>
+</html>

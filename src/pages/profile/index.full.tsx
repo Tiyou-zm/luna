@@ -216,7 +216,7 @@ function ProfilePage() {
               <button
                 type="button"
                 className="mt-1 px-3 py-1 bg-white/60 rounded-lg flex items-center justify-center leading-none gap-1"
-                onClick={() => Taro.navigateTo({url: '/pages/compute-recharge/index'})}
+                onClick={() => Taro.navigateTo({url: '/pages/pricing/index'})}
               >
                 <span className="text-xl text-primary font-medium">去充值</span>
                 <div className="i-mdi-chevron-right text-primary" style={{fontSize: '16px'}} />

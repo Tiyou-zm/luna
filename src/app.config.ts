@@ -11,7 +11,6 @@ const pages = [
   'pages/account-security/index',
   'pages/settings/index',
   'pages/about/index',
-  'pages/compute-recharge/index',
   'pages/admin-finance/index',
   'pages/usage-records/index',
   'pages/package-create/index',
@@ -22,6 +21,7 @@ const enableWxCloudConfig = process.env.TARO_APP_ENABLE_WX_CLOUD !== 'false'
 
 export default defineAppConfig({
   pages,
+  lazyCodeLoading: 'requiredComponents',
   ...(enableWxCloudConfig ? {cloud: true} : {}),
   tabBar: {
     color: '#888888',

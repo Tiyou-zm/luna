@@ -133,7 +133,7 @@ function PricingPage() {
           <span className="text-3xl font-bold text-white">Luna 套餐</span>
           <span className="px-2 py-0 bg-accent text-white text-xl font-bold border border-white">版本对比</span>
         </div>
-        <p className="text-xl" style={{color: 'rgba(255,255,255,0.6)'}}>素材包生成 · 趋势研究 · 图片额度</p>
+        <p className="text-xl" style={{color: 'rgba(255,255,255,0.6)'}}>素材包生成 · 图片生成 · 视频脚本生成</p>
       </div>
 
       {/* 套餐卡片列表 */}
@@ -182,16 +182,6 @@ function PricingPage() {
                       {formatPlanQuota(plan.packageCount, '次')}
                     </span>
                   </div>
-                  {/* 趋势研究 */}
-                  <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 bg-accent/5">
-                    <div className="flex items-center gap-2">
-                      <div className="i-mdi-trending-up text-xl text-foreground" />
-                      <span className="text-xl text-foreground">趋势研究</span>
-                    </div>
-                    <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
-                      {formatPlanQuota(plan.trendCount, '次')}
-                    </span>
-                  </div>
                   {/* 图片额度 */}
                   <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 bg-accent/5">
                     <div className="flex items-center gap-2">
@@ -207,10 +197,10 @@ function PricingPage() {
                     <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 bg-accent/5">
                       <div className="flex items-center gap-2">
                         <div className="i-mdi-video-outline text-xl text-foreground" />
-                        <span className="text-xl text-foreground">视频生成</span>
+                        <span className="text-xl text-foreground">视频脚本生成</span>
                       </div>
                       <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
-                        {formatPlanQuota(plan.videoSeconds, '秒')}
+                        {formatPlanQuota(plan.videoSeconds, '次')}
                       </span>
                     </div>
                   )}
@@ -233,7 +223,7 @@ function PricingPage() {
       <div className="px-4 pt-4">
         <div className="border border-border bg-card px-4 py-4">
           <p className="text-xl text-foreground font-bold mb-2">所有版本均包含</p>
-          {['AI 多平台内容生成', '小红书 / 抖音 / 视频号 / 公众号适配', '热点方向分析（开放后）', '7×12 小时在线客服'].map((item) => (
+          {['AI 多平台内容生成', '小红书 / 抖音 / 视频号 / 公众号适配', '图片提示词与视频脚本生成', '7×12 小时在线客服'].map((item) => (
             <div key={item} className="flex items-center gap-2 mt-1">
               <div className="i-mdi-check text-xl" style={{color: 'hsl(var(--accent))'}} />
               <span className="text-xl text-foreground">{item}</span>

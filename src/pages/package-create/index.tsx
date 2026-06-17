@@ -21,6 +21,7 @@ interface UploadedFile {
 // ── 常量 ─────────────────────────────────────────────────────────
 const PLATFORM_OPTIONS = ['小红书', '抖音', '视频号', '公众号']
 const GOAL_OPTIONS = ['品牌曝光', '产品推广', '活动引流', '粉丝增长', '销售转化', '内容种草']
+const STORAGE_KEY_PACKAGE_STAGE0 = 'luna_package_stage0_payload'
 
 const INDUSTRY_PRESETS = [
   '母婴育儿', '美妆护肤', '餐饮美食', '本地生活',
@@ -99,7 +100,7 @@ function PackageCreatePage() {
     if (generating || !user) return
 
     if (tab === 'material' && !materialText.trim() && uploadedFiles.length === 0) {
-      Taro.showToast({title: '请输入素材内容或上传文件', icon: 'none'})
+      Taro.showToast({title: '请输入内容说明或上传文件', icon: 'none'})
       return
     }
     if (tab === 'direction' && !industryInput.trim()) {
@@ -113,12 +114,20 @@ function PackageCreatePage() {
     try {
       const body: Record<string, unknown> = {
         user_id: user.id,
-        mode: tab,
         platforms: selectedPlatforms,
         goal: GOAL_OPTIONS[goalIndex],
+        source: 'package_create_stage0',
       }
 
       if (tab === 'material') {
+        body.user_message = [
+          'I want to create a material package from my provided assets.',
+          materialText ? `Material text: ${materialText}` : '',
+          uploadedFiles.length ? `Uploaded files: ${uploadedFiles.map((f) => f.url).join(', ')}` : '',
+          `Target platforms: ${selectedPlatforms.join(', ')}`,
+          `Goal: ${GOAL_OPTIONS[goalIndex]}`,
+          'Please run Hermes Stage 0 first. Ask for missing information if needed. Do not start backend generation yet.',
+        ].filter(Boolean).join('\n')
         body.material_text = materialText
         body.material_images = uploadedFiles.map((f) => f.url)
         body.attachments = uploadedFiles.map((f) => ({
@@ -131,6 +140,13 @@ function PackageCreatePage() {
           ...(f.size !== undefined ? {size: f.size} : {}),
         }))
       } else {
+        body.user_message = [
+          'I want to create a material package starting from an industry or direction.',
+          `Industry/direction: ${industryInput}`,
+          `Target platforms: ${selectedPlatforms.join(', ')}`,
+          `Goal: ${GOAL_OPTIONS[goalIndex]}`,
+          'Please run Hermes Stage 0 first. Ask for missing information if needed. Do not start backend generation yet.',
+        ].join('\n')
         body.industry = industryInput
       }
 
@@ -155,21 +171,21 @@ function PackageCreatePage() {
 
       Taro.hideLoading()
 
-      if (data?.accepted || data?.job_id) {
-        Taro.showModal({
-          title: '任务已开始',
-          content: data.reply || 'Luna 已收到任务，Hermes 会在后台制作素材包。完成后会自动进入素材库。',
-          showCancel: false,
-          confirmText: '去素材库',
-          success: async () => {
-            await safeNavigate('/pages/materials/index', {replace: true, delay: 180})
-          },
-        })
-      } else if (data?.material_id) {
-        await safeNavigate(`/pages/package-result/index?id=${data.material_id}`)
-      } else {
-        Taro.showToast({title: '生成失败，请重试', icon: 'none'})
-      }
+      Taro.setStorageSync(STORAGE_KEY_PACKAGE_STAGE0, {
+        userMessage: String(body.user_message || ''),
+        reply: data?.reply || '',
+        data,
+        body,
+      })
+      Taro.showModal({
+        title: '已进入 Hermes Stage 0',
+        content: data?.reply || 'Hermes 已收到初始信息，请回工作台继续确认。',
+        showCancel: false,
+        confirmText: '去工作台',
+        success: async () => {
+          await safeNavigate('/pages/chat/index', {replace: true, delay: 180})
+        },
+      })
     } catch (e: unknown) {
       Taro.hideLoading()
       const msg = e instanceof Error ? e.message : '生成失败，请重试'
@@ -183,7 +199,7 @@ function PackageCreatePage() {
     <div className="min-h-screen bg-background pb-32">
       {/* 模式切换 Tab */}
       <div className="flex border-b border-border bg-card sticky top-0 z-10">
-        {([['material', '用已有素材'], ['direction', '从方向热点']] as const).map(([key, label]) => (
+        {([['material', '用用户提供文件'], ['direction', '从方向生成']] as const).map(([key, label]) => (
           <div
             key={key}
             className="flex-1 flex items-center justify-center py-4"
@@ -204,6 +220,16 @@ function PackageCreatePage() {
       </div>
 
       <div className="px-4 pt-6 flex flex-col gap-6">
+        <div className="border border-primary/20 rounded-xl px-4 py-3" style={{background: 'hsl(var(--primary) / 0.08)'}}>
+          <div className="flex items-center gap-2">
+            <div className="i-mdi-creation text-primary" style={{fontSize: '18px'}} />
+            <span className="text-2xl font-bold text-primary">AI生成 · 人工智能生成</span>
+          </div>
+          <p className="text-xl leading-relaxed mt-1 text-muted-foreground">
+            本页面提供 AI 问答和内容生成服务，生成的文案、脚本、投放分析和素材包均为人工智能生成内容，请结合实际业务核验后使用。
+          </p>
+        </div>
+
         {/* 目标平台 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -260,7 +286,7 @@ function PackageCreatePage() {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
-                <span className="text-2xl font-bold text-foreground">素材内容</span>
+                <span className="text-2xl font-bold text-foreground">内容说明</span>
               </div>
               <div className="border border-border bg-card shadow-card overflow-hidden">
                 <textarea
@@ -280,7 +306,7 @@ function PackageCreatePage() {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
-                <span className="text-2xl font-bold text-foreground">上传素材</span>
+                <span className="text-2xl font-bold text-foreground">上传文件</span>
                 <span className="text-xl text-muted-foreground">（图片/视频，可选）</span>
               </div>
               <div
@@ -372,7 +398,7 @@ function PackageCreatePage() {
                 Luna 将基于该行业的公开信息和平台内容规律，分析当前热点方向，为您生成多平台内容方案。
               </p>
               <p className="text-xl mt-2" style={{color: 'hsl(var(--accent))'}}>
-                Luna 基于用户提供素材、公开信息和平台内容规律生成建议。
+                Luna 基于用户提供信息、公开信息和平台内容规律生成建议。
               </p>
             </div>
           </>

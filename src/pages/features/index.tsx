@@ -60,7 +60,7 @@ const CORE_FEATURES = [
 
 // 使用流程
 const FLOW_STEPS = [
-  {num: '01', title: '选择模式', desc: '已有素材 或 从方向热点出发'},
+  {num: '01', title: '选择模式', desc: '用户提供 或 方向生成'},
   {num: '02', title: '输入内容', desc: '上传图片/文案，或输入行业方向'},
   {num: '03', title: '选择平台', desc: '小红书 / 抖音 / 视频号 / 公众号'},
   {num: '04', title: '一键生成', desc: 'Luna 生成完整四平台素材包'},
@@ -91,11 +91,11 @@ function FeaturesPage() {
         </div>
         <p className="text-2xl font-bold text-white mb-2">多平台素材包生成工作台</p>
         <p className="text-xl leading-relaxed" style={{color: 'rgba(255,255,255,0.65)'}}>
-          从已有素材或行业方向出发，一次输入，生成小红书 / 抖音 / 视频号 / 公众号的完整内容方案。
+          从用户提供文件或行业方向出发，一次输入，生成小红书 / 抖音 / 视频号 / 公众号的完整内容方案。
         </p>
         <div className="mt-4 px-3 py-2 border" style={{borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)'}}>
           <p className="text-xl" style={{color: 'rgba(255,255,255,0.5)'}}>
-            Luna 基于用户提供素材、公开信息和平台内容规律生成建议
+            Luna 基于用户提供信息、公开信息和平台内容规律生成建议
           </p>
         </div>
       </div>
@@ -199,7 +199,7 @@ function FeaturesPage() {
           onClick={() => Taro.navigateTo({url: '/pages/package-create/index?mode=material'})}
         >
           <div className="i-mdi-creation text-4xl text-white" />
-          <span className="text-2xl font-bold text-white">立即生成素材包</span>
+          <span className="text-2xl font-bold text-white">立即新建生成</span>
           <span className="text-xl" style={{color: 'rgba(255,255,255,0.6)'}}>免费版可体验 5 次</span>
         </div>
       </div>

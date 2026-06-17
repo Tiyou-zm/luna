@@ -1,0 +1,14 @@
+{
+  "timeout": 120,
+  "memorySize": 256,
+  "permissions": {
+    "openapi": []
+  },
+  "triggers": [
+    {
+      "name": "cleanupPendingOrdersTimer",
+      "type": "timer",
+      "config": "0 */10 * * * * *"
+    }
+  ]
+}

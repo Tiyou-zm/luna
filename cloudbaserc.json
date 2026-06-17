@@ -3,11 +3,29 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
+      "name": "dbApi",
+      "dir": "./cloudfunctions/dbApi",
+      "handler": "index.main",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
+      "memorySize": 512,
+      "installDependency": true
+    },
+    {
       "name": "lunaGuardian",
       "dir": "./cloudfunctions/lunaGuardian",
       "handler": "index.main",
       "runtime": "Nodejs18.15",
-      "timeout": 60,
+      "timeout": 120,
+      "memorySize": 512,
+      "installDependency": true
+    },
+    {
+      "name": "customerService",
+      "dir": "./cloudfunctions/customerService",
+      "handler": "index.main",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
       "memorySize": 512,
       "installDependency": true
     },
@@ -16,8 +34,17 @@
       "dir": "./cloudfunctions/createWechatPayment",
       "handler": "index.main",
       "runtime": "Nodejs18.15",
-      "timeout": 60,
+      "timeout": 120,
       "memorySize": 512,
+      "installDependency": true
+    },
+    {
+      "name": "cleanupPendingOrders",
+      "dir": "./cloudfunctions/cleanupPendingOrders",
+      "handler": "index.main",
+      "runtime": "Nodejs18.15",
+      "timeout": 120,
+      "memorySize": 256,
       "installDependency": true
     },
     {
@@ -25,7 +52,7 @@
       "dir": "./cloudfunctions/wechatPaymentCallback",
       "handler": "index.main",
       "runtime": "Nodejs18.15",
-      "timeout": 60,
+      "timeout": 120,
       "memorySize": 512,
       "installDependency": true
     }

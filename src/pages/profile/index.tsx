@@ -215,14 +215,14 @@ function ProfilePage() {
         <div className="rounded-2xl p-4" style={{background: 'hsl(252 55% 88%)'}}>
           <div className="flex items-stretch gap-0">
             <div className="flex-1 flex flex-col items-center gap-1 pr-2">
-              <span className="text-xl text-primary/70">可使用创作余额</span>
-              <span className="text-3xl font-bold text-primary">¥{((profile?.balance as number) || 0).toFixed(2)}</span>
+              <span className="text-xl text-primary/70">当前会员</span>
+              <span className="text-3xl font-bold text-primary">{levelLabel}</span>
               <button
                 type="button"
                 className="mt-1 px-3 py-1 bg-white/60 rounded-lg flex items-center justify-center leading-none gap-1"
-                onClick={() => Taro.navigateTo({url: '/pages/compute-recharge/index'})}
+                onClick={() => Taro.navigateTo({url: '/pages/pricing/index'})}
               >
-                <span className="text-xl text-primary font-medium">去充值</span>
+                <span className="text-xl text-primary font-medium">查看会员</span>
                 <div className="i-mdi-chevron-right text-primary" style={{fontSize: '16px'}} />
               </button>
             </div>
@@ -260,9 +260,8 @@ function ProfilePage() {
       <div className="mx-4 mt-4 bg-card rounded-2xl p-4 shadow-card border border-border">
         <div className="flex flex-row flex-wrap gap-3">
           {[
-            {icon: 'i-mdi-receipt-text-outline', label: '我的订单', sub: '套餐/充值记录', url: '/pages/orders/index'},
-            {icon: 'i-mdi-chart-timeline-variant', label: '消耗记录', sub: '生成扣费明细', url: '/pages/usage-records/index'},
-            {icon: 'i-mdi-folder-text-outline', label: '我的素材', sub: '文案/脚本/TOS文件', url: '/pages/materials/index'},
+            {icon: 'i-mdi-receipt-text-outline', label: '我的订单', sub: '会员购买记录', url: '/pages/orders/index'},
+            {icon: 'i-mdi-chart-timeline-variant', label: '生成记录', sub: '素材包与任务明细', url: '/pages/usage-records/index'},
             {icon: 'i-mdi-monitor-dashboard', label: '账号检测', sub: '绑定自媒体账号', url: '/pages/monitor/index'}
           ].map((item) => (
             <div
@@ -341,25 +340,6 @@ function ProfilePage() {
           </div>
         ))}
       </div>
-
-      {/* 管理员入口 */}
-      {profile?.is_admin && (
-        <div className="mx-4 mt-4">
-          <div
-            className="bg-gradient-primary rounded-2xl px-5 py-4 flex items-center gap-4"
-            onClick={() => Taro.navigateTo({url: '/pages/admin-finance/index'})}
-          >
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <div className="i-mdi-shield-crown-outline text-white" style={{fontSize: '22px'}} />
-            </div>
-            <div className="flex-1">
-              <p className="text-2xl font-bold text-white">财务管理中心</p>
-              <p className="text-xl text-white/80">自动对账 · 转账指令 · 资金监控</p>
-            </div>
-            <div className="i-mdi-chevron-right text-white/80" style={{fontSize: '20px'}} />
-          </div>
-        </div>
-      )}
 
       {/* 退出登录 */}
       <div className="mx-4 mt-4">

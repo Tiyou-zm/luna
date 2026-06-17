@@ -15,13 +15,11 @@ const WELCOME_MSG: CsMessage = {
   id: 'welcome',
   user_id: '',
   role: 'assistant',
-  content: '您好！我是Luna的专属客服LUNA，很高兴为您服务！\n\n请问有什么可以帮助到您？您可以询问：\n• 套餐价格与功能\n• 使用教程\n• 账号问题\n• 退款政策',
+  content: '您好！我是 Luna 的专属客服 LUNA，很高兴为您服务。\n\n如果您需要更精细化的内容生成、行业素材拆解、账号诊断或长期陪跑，我们也可以为您对接定制化个人服务。您可以直接描述需求、预算和目标平台，我会帮您整理给工作人员跟进。',
   message_type: 'text',
   is_read: true,
   created_at: new Date().toISOString()
 }
-
-const QUICK_REPLIES = ['套餐价格', '使用教程', '账号问题', '退款政策']
 
 function ServicePage() {
   const {user} = useAuth()
@@ -143,43 +141,9 @@ function ServicePage() {
             <div className="flex items-center gap-2">
               <span className="text-xl font-bold text-white">Hi，我是LUNA</span>
             </div>
-            <p className="text-xl text-white/80">很高兴为您服务，有什么可以帮到您？</p>
+            <p className="text-xl text-white/80">咨询产品使用、生成问题或定制化个人服务</p>
           </div>
         </div>
-      </div>
-
-      {/* ===快捷回复标签（横向滚动）=== */}
-      <ScrollView scrollX className="flex-shrink-0" style={{whiteSpace: 'nowrap', marginBottom: '8px'}}>
-        <div style={{display: 'inline-flex', gap: '8px', padding: '2px 16px'}}>
-          {QUICK_REPLIES.map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => handleSend(q)}
-              className="flex-shrink-0 flex items-center justify-center leading-none rounded-full transition"
-              style={{padding: '6px 14px', background: 'white', border: '1.5px solid hsl(243 67% 57% / 0.35)', color: 'hsl(243 67% 57%)', whiteSpace: 'nowrap'}}
-            >
-              <span className="text-xl font-medium">{q}</span>
-            </button>
-          ))}
-        </div>
-      </ScrollView>
-
-      {/* ===快捷跳转入口=== */}
-      <div className="flex-shrink-0 flex gap-2 px-4 mb-2">
-        {[
-          {icon: 'i-mdi-crown-outline', label: '查看套餐', url: '/pages/pricing/index'},
-          {icon: 'i-mdi-folder-text-outline', label: '素材库', url: '/pages/materials/index', isTab: true},
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="flex-1 bg-card rounded-xl flex flex-row items-center justify-center gap-2 py-2 border border-border"
-            onClick={() => item.isTab ? Taro.switchTab({url: item.url}) : Taro.navigateTo({url: item.url})}
-          >
-            <div className={`${item.icon} text-primary`} style={{fontSize: '18px'}} />
-            <span className="text-xl font-medium text-foreground">{item.label}</span>
-          </div>
-        ))}
       </div>
 
       {/* ===消息区域（ScrollView 必须放在有明确高度的容器里）=== */}

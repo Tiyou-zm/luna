@@ -2,9 +2,10 @@
 import {useState, useCallback, useMemo, useRef, useEffect} from 'react'
 import Taro, {useShareAppMessage, useShareTimeline} from '@tarojs/taro'
 import {Image, ScrollView} from '@tarojs/components'
-import {callCloudFunction} from '@/client/cloudbase'
+import {callCloudFunction, callDbApi} from '@/client/cloudbase'
 import {STORAGE_KEY_REDIRECT_PATH, withRouteGuard} from '@/components/RouteGuard'
 import {LunaAvatar} from '@/components/LunaAvatar'
+import {AIGeneratedBadge} from '@/components/AIGeneratedBadge'
 import {useAuth} from '@/contexts/AuthContext'
 import {selectMediaFiles, selectMessageFile, getMimeType} from '@/utils/upload'
 import type {MiniProgramFileInput} from '@/utils/upload'
@@ -81,6 +82,8 @@ interface ChatMessage {
   isPending?: boolean
   /** 文件附件名称（文件类型时显示） */
   attachName?: string
+  /** Hermes foreground turn that is still being continued by the worker. */
+  pendingTurnId?: string | null
   created_at: string
 }
 
@@ -103,6 +106,8 @@ const QUICK_PROMPTS = [
   '本地探店内容，帮我想方向',
   '帮我改写这段文案，更像小红书',
 ]
+
+const STORAGE_KEY_PACKAGE_STAGE0 = 'luna_package_stage0_payload'
 
 // ── 欢迎消息 ───────────────────────────────────────────────────────
 const WELCOME: ChatMessage = {
@@ -194,7 +199,10 @@ function ResultCardView({card}: {card: ResultCard}) {
         <span className="text-xl font-bold text-white">内容包已生成完成</span>
       </div>
       <div className="px-4 py-3 flex flex-col gap-2">
-        <span className="text-xl font-bold text-foreground">{card.title}</span>
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-xl font-bold text-foreground">{card.title}</span>
+          <AIGeneratedBadge tone="green" />
+        </div>
         <div className="flex flex-wrap gap-1">
           {card.platforms.map((p) => (
             <span key={p} className="px-2 py-0.5 rounded-full text-xl" style={{background: 'hsl(141 60% 45% / 0.1)', color: 'hsl(141 60% 32%)'}}>{p}</span>
@@ -267,10 +275,12 @@ function WorkbenchPage() {
   const [pendingAttachment, setPendingAttachment] = useState<AttachmentMeta | null>(null)
   const [uploading, setUploading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [activeStage0DraftId, setActiveStage0DraftId] = useState<string | null>(null)
   const [stableWindowHeight] = useState(() => (
     Taro.getEnv() === Taro.ENV_TYPE.WEB ? 812 : getMiniWindowHeight()
   ))
   const lastTapAt = useRef(0)
+  const packageStage0Loaded = useRef(false)
 
   useShareAppMessage(() => ({title: 'Luna AI — 内容创作工作台'}))
   useShareTimeline(() => ({title: 'Luna AI — 内容创作工作台'}))
@@ -279,6 +289,63 @@ function WorkbenchPage() {
     const timer = setTimeout(() => setBootReady(true), 0)
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    if (!bootReady || packageStage0Loaded.current) return
+    packageStage0Loaded.current = true
+    try {
+      const payload = Taro.getStorageSync(STORAGE_KEY_PACKAGE_STAGE0) as {
+        userMessage?: string
+        reply?: string
+        data?: Record<string, unknown>
+        body?: Record<string, unknown>
+      } | ''
+      if (!payload || typeof payload !== 'object') return
+      Taro.removeStorageSync(STORAGE_KEY_PACKAGE_STAGE0)
+      const data = payload.data || {}
+      const body = payload.body || {}
+      const reply = String(payload.reply || data.reply || '')
+      const interactionIntent = String(data.interaction_intent || '')
+      const draftId = String(data.draft_id || '')
+      if (draftId) setActiveStage0DraftId(draftId)
+      const handoffContext = data.handoff_context || (data.interaction as Record<string, unknown> | undefined)?.handoff_context || {}
+      const ready = Boolean(data.ready_for_generation || data.interaction_stage === 'stage0_ready' || interactionIntent === 'confirm_start')
+      const assistantMsg: ChatMessage = {
+        id: `pkg_${Date.now()}`,
+        role: 'assistant',
+        content: reply,
+        created_at: new Date().toISOString(),
+      }
+      if (ready) {
+        assistantMsg.interactionCard = {
+          intent: 'confirm_start',
+          title: 'Hermes 请求确认开始制作',
+          reply,
+          outlineText: reply,
+          rawBody: {
+            ...body,
+            ...(draftId ? {draft_id: draftId} : {}),
+            handoff_context: handoffContext,
+            confirmed_outline: handoffContext || reply,
+          },
+          task: (data.task || null) as Record<string, unknown> | null,
+        }
+      }
+      const userMessage = String(payload.userMessage || body.user_message || '')
+      setMessages((prev) => [
+        ...prev,
+        ...(userMessage ? [{
+          id: `pkg_u_${Date.now()}`,
+          role: 'user' as const,
+          content: userMessage,
+          created_at: new Date().toISOString(),
+        }] : []),
+        assistantMsg,
+      ])
+    } catch {
+      // ignore malformed handoff cache
+    }
+  }, [bootReady])
 
   const lastMsgId = useMemo(() => {
     const last = messages[messages.length - 1]
@@ -296,7 +363,7 @@ function WorkbenchPage() {
     if (user) return true
     Taro.showModal({
       title: '需要登录',
-      content: '登录后可以生成内容、上传素材，并保存到你的素材库。',
+      content: '登录后可以生成内容、上传文件，并保存到你的素材库。',
       confirmText: '去登录',
       cancelText: '先看看',
       success: ({confirm}) => {
@@ -308,6 +375,56 @@ function WorkbenchPage() {
     })
     return false
   }, [user])
+
+  const pollHermesTurn = useCallback((turnId: string, messageId: string, rawBody: Record<string, unknown>, attempt = 0) => {
+    if (!turnId || attempt > 40) return
+    setTimeout(async () => {
+      try {
+        const turn = await callDbApi<any>('getHermesChatTurn', {turnId})
+        if (!turn || turn.status === 'pending' || turn.status === 'running') {
+          pollHermesTurn(turnId, messageId, rawBody, attempt + 1)
+          return
+        }
+
+        if (turn.status === 'succeeded') {
+          const handoff = (turn.handoff || {}) as Record<string, unknown>
+          const stage = String(handoff.stage || '')
+          const ready = Boolean(handoff.ready_for_generation || stage === 'stage0_ready')
+          const reply = String(turn.reply || '')
+          const draftId = String(turn.draft_id || handoff.draft_id || rawBody.draft_id || '')
+          if (draftId) setActiveStage0DraftId(draftId)
+          const interactionCard = ready ? {
+            intent: 'confirm_start' as const,
+            title: 'Hermes 请求确认开始制作',
+            reply,
+            outlineText: reply,
+            rawBody: {
+              ...rawBody,
+              ...(draftId ? {draft_id: draftId} : {}),
+              handoff_context: handoff.handoff_context || {},
+              confirmed_outline: handoff.handoff_context || reply,
+            },
+            task: (handoff.task || null) as Record<string, unknown> | null,
+          } : null
+          setMessages((prev) => prev.map((msg) => msg.id === messageId ? {
+            ...msg,
+            content: reply || msg.content,
+            pendingTurnId: null,
+            interactionCard,
+          } : msg))
+          return
+        }
+
+        setMessages((prev) => prev.map((msg) => msg.id === messageId ? {
+          ...msg,
+          content: 'Hermes 这轮暂时没有完成回复，你可以继续补充信息或稍后再试。',
+          pendingTurnId: null,
+        } : msg))
+      } catch {
+        pollHermesTurn(turnId, messageId, rawBody, attempt + 1)
+      }
+    }, attempt < 4 ? 3000 : 6000)
+  }, [])
 
   // ── 发送消息 ────────────────────────────────────────────────────
   const handleSend = useCallback(async (quickText?: string) => {
@@ -321,7 +438,7 @@ function WorkbenchPage() {
     // 只有附件没有文字时，自动补充描述让 Luna 知道有素材要处理
     const effectiveText = text || (isImageAttach
       ? `请根据这张图片帮我生成多平台内容`
-      : `请根据上传的文件「${attachment?.name ?? '素材文件'}」帮我生成多平台内容`)
+      : `请根据上传的文件「${attachment?.name ?? '文件资产'}」帮我生成多平台内容`)
 
     setInputText('')
     setPendingAttachment(null)
@@ -361,6 +478,7 @@ function WorkbenchPage() {
         user_message: effectiveText,
         attachments,
         history,
+        ...(activeStage0DraftId ? {draft_id: activeStage0DraftId} : {}),
         platforms: ['小红书', '抖音', '视频号', '公众号'],
       }
 
@@ -373,29 +491,44 @@ function WorkbenchPage() {
       const result = (data?.result as Record<string, unknown>) || null
       const materialId: string | null = (data?.material_id as string) || null
       const accepted = Boolean(data?.accepted || data?.job_id)
+      const pendingTurnId = String(data?.turn_id || '')
       const interactionIntent = String(data?.interaction_intent || '')
       const interaction = (data?.interaction || {}) as Record<string, unknown>
       const interactionOutline = data?.outline || interaction.outline || null
       const interactionTask = (data?.task || interaction.task || null) as Record<string, unknown> | null
+      const draftId = String(data?.draft_id || '')
+      const readyForGeneration = Boolean(data?.ready_for_generation || data?.interaction_stage === 'stage0_ready' || interactionIntent === 'confirm_start')
+      if (draftId) setActiveStage0DraftId(draftId)
 
-      if (accepted) {
+      if (data?.pending && pendingTurnId) {
+        const pendingId = `p_${Date.now()}`
+        setMessages((prev) => [...prev, {
+          id: pendingId,
+          role: 'assistant',
+          content: reply || 'Hermes 还在处理，我会继续等待它的正式回复。',
+          pendingTurnId,
+          created_at: new Date().toISOString(),
+        }])
+        pollHermesTurn(pendingTurnId, pendingId, body)
+      } else if (accepted) {
+        setActiveStage0DraftId(null)
         setMessages((prev) => [...prev, {
           id: `j_${Date.now()}`,
           role: 'assistant',
-          content: reply || 'Luna 已收到任务，Hermes 会在后台制作素材包。完成后会按文案、视频脚本、投放分析和素材文件归档到素材库。',
+          content: reply || 'Luna 已收到任务，Hermes 会在后台制作素材包。完成后会按文案、视频脚本、投放分析和文件资产归档到素材库。',
           created_at: new Date().toISOString(),
         }])
-      } else if (['outline', 'confirm_start', 'start_generation'].includes(interactionIntent)) {
-        const outlineText = typeof interactionOutline === 'string'
-          ? interactionOutline
-          : interactionOutline ? JSON.stringify(interactionOutline, null, 2) : reply
+      } else if (readyForGeneration) {
+        const outlineText = reply || '信息已确认完毕，请确认是否开始制作素材包。'
         const interactionCard: InteractionCard = {
-          intent: interactionIntent as InteractionCard['intent'],
+          intent: 'confirm_start',
           title: interactionIntent === 'outline' ? 'Hermes 生成了制作大纲' : 'Hermes 请求确认开始制作',
           reply,
           outlineText,
           rawBody: {
             ...body,
+            ...(draftId ? {draft_id: draftId} : {}),
+            handoff_context: data?.handoff_context || interaction.handoff_context || {},
             pending_task: interactionTask,
             confirmed_outline: interactionOutline || reply,
           },
@@ -408,7 +541,7 @@ function WorkbenchPage() {
           interactionCard,
           created_at: new Date().toISOString(),
         }])
-      } else if ((taskType === 'material_package' || taskType === 'direction_package'
+      } else if (false && (taskType === 'material_package' || taskType === 'direction_package'
         || taskType === 'copy_rewrite' || taskType === 'video_script' || taskType === 'advice_only')
         && !result) {
         const platforms = ['小红书', '抖音', '视频号', '公众号']
@@ -465,7 +598,7 @@ function WorkbenchPage() {
     } finally {
       setSending(false)
     }
-  }, [inputText, pendingAttachment, requireLogin, sending, user, messages])
+  }, [activeStage0DraftId, inputText, pendingAttachment, pollHermesTurn, requireLogin, sending, user, messages])
 
   // ── 任务卡：直接生成 ────────────────────────────────────────────
   const handleDirectGenerate = useCallback(async (taskCard: TaskCard) => {
@@ -477,8 +610,13 @@ function WorkbenchPage() {
       const body: Record<string, unknown> = {
         ...taskCard.rawBody,
         user_id: user?.id || 'wechat_session',
+        action: 'start_generation',
+        stage0_confirmed: true,
+        draft_id: taskCard.rawBody.draft_id || activeStage0DraftId || null,
+        user_message: '确认开始制作',
         mode: taskCard.taskType === 'direction_package' ? 'direction' : 'material',
         platforms: taskCard.platform,
+        handoff_context: taskCard.rawBody.handoff_context || taskCard.rawBody.confirmed_outline || {},
       }
       const {data, error} = await callLunaGuardian(body)
       if (error) throw new Error(error)
@@ -518,7 +656,7 @@ function WorkbenchPage() {
     } finally {
       setSending(false)
     }
-  }, [requireLogin, sending, user])
+  }, [activeStage0DraftId, requireLogin, sending, user])
 
   // ── 任务卡：编辑任务（跳转高级编辑）───────────────────────────
   const handleConfirmInteraction = useCallback(async (card: InteractionCard) => {
@@ -531,12 +669,21 @@ function WorkbenchPage() {
         ...card.rawBody,
         user_id: user?.id || 'wechat_session',
         action: 'start_generation',
+        stage0_confirmed: true,
+        draft_id: card.rawBody.draft_id || activeStage0DraftId || null,
         user_message: '确认开始制作',
+        handoff_context: card.rawBody.handoff_context || card.rawBody.confirmed_outline || card.outlineText || card.reply,
+        conversation_history: messages
+          .filter((m) => !m.isPending && (m.role === 'user' || m.role === 'assistant'))
+          .filter((m) => m.content && m.content.trim())
+          .slice(-12)
+          .map((m) => ({role: m.role, content: m.content})),
         confirmed_outline: card.rawBody.confirmed_outline || card.outlineText || card.reply,
         pending_task: card.task || card.rawBody.pending_task || null,
       }
       const {data, error} = await callLunaGuardian(body)
       if (error) throw new Error(error)
+      setActiveStage0DraftId(null)
       const reply: string = (data?.reply as string) || '任务已开始制作，完成后会自动进入素材库。'
       setMessages((prev) => [...prev, {
         id: `j_${Date.now()}`,
@@ -550,7 +697,7 @@ function WorkbenchPage() {
     } finally {
       setSending(false)
     }
-  }, [requireLogin, sending, user])
+  }, [activeStage0DraftId, messages, requireLogin, sending, user])
 
   const handleContinueInteraction = useCallback((card: InteractionCard) => {
     setInputText(card.intent === 'outline' ? '我想调整这个大纲：' : '我再补充一点：')
@@ -666,7 +813,7 @@ function WorkbenchPage() {
         }
         const fileKey = result.data.key
         const publicUrl = result.data.url
-        const fileName = (file as MiniProgramFileInput).name || '素材文件'
+        const fileName = (file as MiniProgramFileInput).name || '文件资产'
         const ext = fileName.split('.').pop()?.toLowerCase() || 'file'
         const meta: AttachmentMeta = {
           type: 'file',
@@ -705,11 +852,14 @@ function WorkbenchPage() {
   const windowHeight = isWeb ? 812 : stableWindowHeight
   const tabBarReserve = isWeb ? 0 : 6
   const usableHeight = Math.max(360, windowHeight - tabBarReserve)
+  const heroHeight = 86
+  const quickPromptHeight = 45
+  const inputBarHeight = 66
   const containerHeight = isWeb ? 'calc(100vh - 50px)' : `${usableHeight}px`
   // WeChat scroll-view does not always resolve height: 100% inside flex children.
   const messageListHeight = isWeb
-    ? 'calc(100vh - 50px - 58px - 45px - 66px)'
-    : `${Math.max(180, usableHeight - 58 - 45 - 66)}px`
+    ? `calc(100vh - 50px - ${heroHeight}px - ${quickPromptHeight}px - ${inputBarHeight}px)`
+    : `${Math.max(180, usableHeight - heroHeight - quickPromptHeight - inputBarHeight)}px`
 
   if (!bootReady) {
     return (
@@ -722,6 +872,9 @@ function WorkbenchPage() {
             <div>
               <span className="text-xl font-bold text-white">Luna AI 工作台</span>
               <p className="text-xl" style={{color: 'rgba(255,255,255,0.7)'}}>自由对话 · 多平台内容生成</p>
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0" style={{background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)'}}>
+                <span className="text-xl font-bold text-white">AI生成 · 人工智能生成</span>
+              </div>
             </div>
           </div>
         </div>
@@ -742,6 +895,9 @@ function WorkbenchPage() {
             <div>
               <span className="text-xl font-bold text-white">Luna AI 工作台</span>
               <p className="text-xl" style={{color: 'rgba(255,255,255,0.7)'}}>自由对话 · 多平台内容生成</p>
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0" style={{background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)'}}>
+                <span className="text-xl font-bold text-white">AI生成 · 人工智能生成</span>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -849,7 +1005,7 @@ function WorkbenchPage() {
                         </div>
                       )}
                       {/* 任务卡片 */}
-                      {msg.taskCard && (
+                      {false && msg.taskCard && (
                         <TaskCardView
                           card={msg.taskCard}
                           onGenerate={() => handleDirectGenerate(msg.taskCard!)}

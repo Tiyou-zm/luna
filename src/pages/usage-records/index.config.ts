@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '消耗记录',
+  navigationBarTitleText: '生成记录',
   enableShareAppMessage: true,
   enableShareTimeline: true,
 })

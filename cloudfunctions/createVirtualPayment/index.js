@@ -15,7 +15,7 @@ const SANDBOX_APP_KEY = process.env.VIRTUAL_PAY_SANDBOX_APP_KEY || ''
 const ENV = Number(process.env.VIRTUAL_PAY_ENV || 0)
 const MODE = process.env.VIRTUAL_PAY_MODE || 'short_series_goods'
 const TRIAL_PRODUCT_ID = process.env.VIRTUAL_PAY_TRIAL_PRODUCT_ID || ''
-const TRIAL_PRICE_CENTS = Number(process.env.VIRTUAL_PAY_TRIAL_PRICE_CENTS || 666)
+const TRIAL_PRICE_CENTS = Number(process.env.VIRTUAL_PAY_TRIAL_PRICE_CENTS || 1990)
 const TRIAL_PLAN_LEVEL = process.env.VIRTUAL_PAY_TRIAL_PLAN_LEVEL || 'trial'
 
 function now() {

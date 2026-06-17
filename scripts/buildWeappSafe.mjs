@@ -39,4 +39,30 @@ if (patch.status !== 0) {
 
 fs.mkdirSync(distRoot, {recursive: true})
 fs.cpSync(tempRoot, distRoot, {recursive: true, force: true})
+
+const legacyComputeRechargeDir = path.resolve(distRoot, 'pages/compute-recharge')
+fs.mkdirSync(legacyComputeRechargeDir, {recursive: true})
+fs.writeFileSync(
+  path.resolve(legacyComputeRechargeDir, 'index.json'),
+  JSON.stringify({navigationBarTitleText: 'Luna'}, null, 2),
+)
+fs.writeFileSync(
+  path.resolve(legacyComputeRechargeDir, 'index.wxml'),
+  '<view></view>\n',
+)
+fs.writeFileSync(
+  path.resolve(legacyComputeRechargeDir, 'index.js'),
+  [
+    'Page({',
+    '  onLoad() {',
+    "    wx.redirectTo({url: '/pages/pricing/index'})",
+    '  },',
+    '})',
+    '',
+  ].join('\n'),
+)
+fs.writeFileSync(
+  path.resolve(legacyComputeRechargeDir, 'index.wxss'),
+  '',
+)
 console.log(`safe copied ${path.relative(root, tempRoot)} -> dist without clearing dist first`)
