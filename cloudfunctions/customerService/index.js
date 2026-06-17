@@ -56,6 +56,7 @@ const CUSTOMER_SERVICE_SYSTEM_PROMPT = [
   '定制服务：如果用户需要深度定制，询问行业/产品、目标平台、预算范围、交付周期、期望结果、是否有现成素材。可以转人工对接，但不要直接承诺价格和排期。',
   '',
   '输出格式：默认输出自然语言；不输出 JSON；不输出 Markdown 表格，除非用户明确要求对比；每次回复尽量不超过 180 字。',
+  '不要输出思考过程，不要输出 <think>、<thinking> 或类似内部推理内容。',
 ].join('\n')
 
 function now() {
@@ -195,7 +196,12 @@ async function loadRecentCustomerContext(userId, currentAt) {
 
 function extractReply(response) {
   const content = response?.choices?.[0]?.message?.content || response?.content || response?.reply || ''
-  if (typeof content === 'string') return content.trim()
+  if (typeof content === 'string') {
+    return content
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .trim()
+  }
   try { return JSON.stringify(content) } catch { return '' }
 }
 
