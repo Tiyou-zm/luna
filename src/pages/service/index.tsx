@@ -1,14 +1,14 @@
 // @title 客服
 import {useState, useCallback, useEffect, useMemo} from 'react'
 import Taro, {useDidShow, useShareAppMessage, useShareTimeline} from '@tarojs/taro'
-import {Image, ScrollView} from '@tarojs/components'
+import {Image, ScrollView, Textarea} from '@tarojs/components'
 import {callCloudFunction} from '@/client/cloudbase'
 import {LunaAvatar} from '@/components/LunaAvatar'
 import {withRouteGuard} from '@/components/RouteGuard'
 import {useAuth} from '@/contexts/AuthContext'
 import {getCsMessages} from '@/db/api'
 import {selectMediaFiles, uploadToSupabase} from '@/utils/upload'
-import {getMiniWindowHeight} from '@/utils/system'
+import {getMiniWindowMetrics} from '@/utils/system'
 import type {CsMessage} from '@/db/types'
 
 const WELCOME_MSG: CsMessage = {
@@ -23,11 +23,16 @@ const WELCOME_MSG: CsMessage = {
 
 function ServicePage() {
   const {user} = useAuth()
+  const isWeb = Taro.getEnv() === Taro.ENV_TYPE.WEB
   const [messages, setMessages] = useState<CsMessage[]>([WELCOME_MSG])
   const [inputText, setInputText] = useState('')
   const [pendingImage, setPendingImage] = useState<{tempPath: string; publicUrl: string} | null>(null)
   const [uploading, setUploading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [windowMetrics, setWindowMetrics] = useState(() => (
+    isWeb ? {windowHeight: 812, screenHeight: 812, safeBottom: 0} : getMiniWindowMetrics()
+  ))
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   useShareAppMessage(() => ({title: 'Luna AI 在线客服'}))
   useShareTimeline(() => ({title: 'Luna AI 在线客服'}))
@@ -45,6 +50,31 @@ function ServicePage() {
 
   useEffect(() => { loadMessages() }, [loadMessages])
   useDidShow(() => { loadMessages() })
+
+  useEffect(() => {
+    if (isWeb) return
+    const taroApi = Taro as typeof Taro & {
+      onWindowResize?: (callback: () => void) => void
+      offWindowResize?: (callback: () => void) => void
+      onKeyboardHeightChange?: (callback: (res: {height?: number}) => void) => void
+      offKeyboardHeightChange?: (callback: (res: {height?: number}) => void) => void
+    }
+    const refreshMetrics = () => setWindowMetrics(getMiniWindowMetrics())
+    const handleResize = () => refreshMetrics()
+    const handleKeyboard = (res: {height?: number}) => {
+      setKeyboardHeight(Number(res?.height || 0))
+      setTimeout(refreshMetrics, 30)
+    }
+
+    refreshMetrics()
+    taroApi.onWindowResize?.(handleResize)
+    taroApi.onKeyboardHeightChange?.(handleKeyboard)
+
+    return () => {
+      taroApi.offWindowResize?.(handleResize)
+      taroApi.offKeyboardHeightChange?.(handleKeyboard)
+    }
+  }, [isWeb])
 
   const handlePickImage = async () => {
     if (uploading || sending) return
@@ -114,11 +144,11 @@ function ServicePage() {
 
   const canSend = (inputText.trim() || !!pendingImage) && !sending && !uploading
 
-  const isWeb = Taro.getEnv() === Taro.ENV_TYPE.WEB
-  const windowHeight = isWeb ? 812 : getMiniWindowHeight()
+  const windowHeight = Math.max(360, windowMetrics.windowHeight)
   const containerHeight = isWeb
     ? 'calc(100vh - 50px)'
     : `${windowHeight}px`
+  const composerPaddingBottom = keyboardHeight > 0 ? 6 : Math.max(4, Math.min(8, windowMetrics.safeBottom || 4))
 
   return (
     <div style={{height: containerHeight, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'hsl(252 30% 97%)'}}>
@@ -147,7 +177,7 @@ function ServicePage() {
       </div>
 
       {/* ===消息区域（ScrollView 必须放在有明确高度的容器里）=== */}
-      <div style={{flex: 1, overflow: 'hidden'}}>
+      <div style={{flex: 1, minHeight: 0, overflow: 'hidden'}}>
         <ScrollView scrollY scrollIntoView={lastMsgId} scrollWithAnimation style={{height: '100%'}}>
           <div className="px-4 py-2 flex flex-col gap-4">
           {messages.map((msg, idx) => {
@@ -264,7 +294,7 @@ function ServicePage() {
             <span className="text-xl" style={{color: 'hsl(252 20% 55%)'}}>{uploading ? '上传中...' : '图片已选择'}</span>
           </div>
         )}
-        <div className="flex items-center gap-2 px-4" style={{paddingTop: '10px', paddingBottom: '4px'}}>
+        <div className="flex items-end gap-2 px-4" style={{paddingTop: '10px', paddingBottom: `${composerPaddingBottom}px`}}>
           <button
             type="button"
             onClick={handlePickImage}
@@ -273,12 +303,16 @@ function ServicePage() {
           >
             <div className={`${uploading ? 'i-mdi-loading animate-spin' : 'i-mdi-image-plus-outline'} text-primary`} style={{fontSize: '22px'}} />
           </button>
-          <div className="flex-1" style={{background: 'hsl(252 20% 97%)', border: '1.5px solid hsl(243 67% 57% / 0.2)', borderRadius: '22px', padding: '10px 16px', minHeight: '44px'}}>
-            <input
+          <div className="flex-1" style={{background: 'hsl(252 20% 97%)', border: '1.5px solid hsl(243 67% 57% / 0.2)', borderRadius: '22px', padding: '8px 14px', minHeight: '44px', maxHeight: '116px', overflow: 'hidden'}}>
+            <Textarea
               className="w-full text-xl bg-transparent outline-none"
-              style={{color: 'hsl(252 30% 20%)', display: 'block', lineHeight: '1.4'}}
+              style={{color: 'hsl(252 30% 20%)', display: 'block', lineHeight: '22px', minHeight: '26px', maxHeight: '96px'}}
               placeholder="请输入您的问题..."
               value={inputText}
+              autoHeight
+              cursorSpacing={8}
+              showConfirmBar={false}
+              adjustPosition
               onInput={(e) => { const ev = e as any; setInputText(ev.detail?.value ?? ev.target?.value ?? '') }}
             />
           </div>

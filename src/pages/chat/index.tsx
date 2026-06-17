@@ -1,7 +1,7 @@
 // @title 工作台
 import {useState, useCallback, useMemo, useRef, useEffect} from 'react'
 import Taro, {useShareAppMessage, useShareTimeline} from '@tarojs/taro'
-import {Image, ScrollView} from '@tarojs/components'
+import {Image, ScrollView, Textarea} from '@tarojs/components'
 import {callCloudFunction, callDbApi} from '@/client/cloudbase'
 import {STORAGE_KEY_REDIRECT_PATH, withRouteGuard} from '@/components/RouteGuard'
 import {LunaAvatar} from '@/components/LunaAvatar'
@@ -10,7 +10,7 @@ import {useAuth} from '@/contexts/AuthContext'
 import {selectMediaFiles, selectMessageFile, getMimeType} from '@/utils/upload'
 import type {MiniProgramFileInput} from '@/utils/upload'
 import {uploadToCos} from '@/utils/cos'
-import {getMiniWindowHeight} from '@/utils/system'
+import {getMiniWindowMetrics} from '@/utils/system'
 import {safeNavigate} from '@/utils/navigation'
 
 async function callLunaGuardian(
@@ -268,6 +268,7 @@ function InteractionCardView({card, onConfirm, onContinue}: {
 
 function WorkbenchPage() {
   const {user, profile} = useAuth()
+  const isWeb = Taro.getEnv() === Taro.ENV_TYPE.WEB
   const [bootReady, setBootReady] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME])
   const [inputText, setInputText] = useState('')
@@ -276,9 +277,10 @@ function WorkbenchPage() {
   const [uploading, setUploading] = useState(false)
   const [sending, setSending] = useState(false)
   const [activeStage0DraftId, setActiveStage0DraftId] = useState<string | null>(null)
-  const [stableWindowHeight] = useState(() => (
-    Taro.getEnv() === Taro.ENV_TYPE.WEB ? 812 : getMiniWindowHeight()
+  const [windowMetrics, setWindowMetrics] = useState(() => (
+    isWeb ? {windowHeight: 812, screenHeight: 812, safeBottom: 0} : getMiniWindowMetrics()
   ))
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const lastTapAt = useRef(0)
   const packageStage0Loaded = useRef(false)
 
@@ -289,6 +291,31 @@ function WorkbenchPage() {
     const timer = setTimeout(() => setBootReady(true), 0)
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    if (isWeb) return
+    const taroApi = Taro as typeof Taro & {
+      onWindowResize?: (callback: () => void) => void
+      offWindowResize?: (callback: () => void) => void
+      onKeyboardHeightChange?: (callback: (res: {height?: number}) => void) => void
+      offKeyboardHeightChange?: (callback: (res: {height?: number}) => void) => void
+    }
+    const refreshMetrics = () => setWindowMetrics(getMiniWindowMetrics())
+    const handleResize = () => refreshMetrics()
+    const handleKeyboard = (res: {height?: number}) => {
+      setKeyboardHeight(Number(res?.height || 0))
+      setTimeout(refreshMetrics, 30)
+    }
+
+    refreshMetrics()
+    taroApi.onWindowResize?.(handleResize)
+    taroApi.onKeyboardHeightChange?.(handleKeyboard)
+
+    return () => {
+      taroApi.offWindowResize?.(handleResize)
+      taroApi.offKeyboardHeightChange?.(handleKeyboard)
+    }
+  }, [isWeb])
 
   useEffect(() => {
     if (!bootReady || packageStage0Loaded.current) return
@@ -848,18 +875,9 @@ function WorkbenchPage() {
   const canSend = (inputText.trim() || !!pendingAttachment) && !sending && !uploading
   const planLabel = profile?.membership_level === 'free' ? '免费版' : (profile?.membership_level || '免费版')
 
-  const isWeb = Taro.getEnv() === Taro.ENV_TYPE.WEB
-  const windowHeight = isWeb ? 812 : stableWindowHeight
-  const tabBarReserve = isWeb ? 0 : 6
-  const usableHeight = Math.max(360, windowHeight - tabBarReserve)
-  const heroHeight = 86
-  const quickPromptHeight = 45
-  const inputBarHeight = 66
-  const containerHeight = isWeb ? 'calc(100vh - 50px)' : `${usableHeight}px`
-  // WeChat scroll-view does not always resolve height: 100% inside flex children.
-  const messageListHeight = isWeb
-    ? `calc(100vh - 50px - ${heroHeight}px - ${quickPromptHeight}px - ${inputBarHeight}px)`
-    : `${Math.max(180, usableHeight - heroHeight - quickPromptHeight - inputBarHeight)}px`
+  const viewportHeight = Math.max(360, windowMetrics.windowHeight)
+  const containerHeight = isWeb ? 'calc(100vh - 50px)' : `${viewportHeight}px`
+  const composerPaddingBottom = keyboardHeight > 0 ? 6 : Math.max(4, Math.min(8, windowMetrics.safeBottom || 4))
 
   if (!bootReady) {
     return (
@@ -932,12 +950,13 @@ function WorkbenchPage() {
       </ScrollView>
 
       {/* ── 消息列表（微信小程序必须给 scroll-view 明确高度）── */}
-      <ScrollView
-        scrollY
-        scrollIntoView={lastMsgId}
-        scrollWithAnimation
-        style={{height: messageListHeight, background: 'hsl(252 30% 97%)'}}
-      >
+      <div style={{flex: 1, minHeight: 0, overflow: 'hidden', background: 'hsl(252 30% 97%)'}}>
+        <ScrollView
+          scrollY
+          scrollIntoView={lastMsgId}
+          scrollWithAnimation
+          style={{height: '100%', background: 'hsl(252 30% 97%)'}}
+        >
           <div className="px-4 py-3 flex flex-col gap-4">
           {messages.map((msg) => {
             const isUser = msg.role === 'user'
@@ -1048,7 +1067,8 @@ function WorkbenchPage() {
           )}
           <div id="anchor_bottom" style={{height: '8px'}} />
         </div>
-      </ScrollView>
+        </ScrollView>
+      </div>
 
       {/* ── 输入区（flex-shrink-0，贴在 ScrollView 下方）── */}
       <div
@@ -1114,7 +1134,7 @@ function WorkbenchPage() {
           </div>
         )}
         {/* 输入行 */}
-        <div className="flex items-center gap-2 px-4" style={{paddingTop: '10px', paddingBottom: '4px'}}>
+        <div className="flex items-end gap-2 px-4" style={{paddingTop: '10px', paddingBottom: `${composerPaddingBottom}px`}}>
           <button
             onClick={() => runTap(handlePickAttachment)}
             onTouchEnd={() => runTap(handlePickAttachment)}
@@ -1123,12 +1143,16 @@ function WorkbenchPage() {
           >
             <div className={`${uploading ? 'i-mdi-loading animate-spin' : 'i-mdi-plus-circle-outline'} text-primary`} style={{fontSize: '22px'}} />
           </button>
-          <div className="flex-1" style={{background: 'hsl(252 20% 97%)', border: '1.5px solid hsl(243 67% 57% / 0.2)', borderRadius: '22px', padding: '10px 16px', minHeight: '44px'}}>
-            <input
+          <div className="flex-1" style={{background: 'hsl(252 20% 97%)', border: '1.5px solid hsl(243 67% 57% / 0.2)', borderRadius: '22px', padding: '8px 14px', minHeight: '44px', maxHeight: '116px', overflow: 'hidden'}}>
+            <Textarea
               className="w-full text-xl bg-transparent outline-none"
-              style={{color: 'hsl(252 30% 20%)', display: 'block', lineHeight: '1.4'}}
+              style={{color: 'hsl(252 30% 20%)', display: 'block', lineHeight: '22px', minHeight: '26px', maxHeight: '96px'}}
               placeholder="告诉 Luna 你想创作什么内容…"
               value={inputText}
+              autoHeight
+              cursorSpacing={8}
+              showConfirmBar={false}
+              adjustPosition
               onInput={(e) => { const ev = e as any; setInputText(ev.detail?.value ?? ev.target?.value ?? '') }}
             />
           </div>
