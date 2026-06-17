@@ -113,4 +113,50 @@
     border: 2px solid hsl(var(--primary));
     box-shadow: var(--shadow-primary);
   }
+
+  .btn-primary {
+    background: var(--gradient-primary);
+    color: hsl(var(--primary-foreground));
+    box-shadow: var(--shadow-primary);
+    border-color: hsl(var(--primary) / 0.45);
+  }
+
+  .btn-secondary {
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+    box-shadow: var(--shadow-card);
+  }
+
+  .btn-disabled {
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    border-color: hsl(var(--border));
+    box-shadow: none;
+  }
+
+  .state-selected {
+    background: var(--gradient-primary);
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary));
+    box-shadow: var(--shadow-primary);
+  }
+
+  .state-soft {
+    background: hsl(var(--primary) / 0.08);
+    color: hsl(var(--primary));
+    border-color: hsl(var(--primary) / 0.18);
+  }
+
+  .state-success {
+    background: hsl(141 60% 45% / 0.12);
+    color: hsl(141 60% 30%);
+    border-color: hsl(141 60% 45% / 0.25);
+  }
+
+  .state-warning {
+    background: hsl(38 92% 52% / 0.14);
+    color: hsl(32 85% 35%);
+    border-color: hsl(38 92% 52% / 0.28);
+  }
 }

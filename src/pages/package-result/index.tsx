@@ -384,7 +384,7 @@ function SectionBlock({skey, label, icon, value}: {
               <div key={i} className="flex items-start gap-2">
                 <span
                   className="text-xl font-bold flex-shrink-0"
-                  style={{color: 'hsl(var(--accent))'}}
+                  style={{color: 'hsl(var(--primary))'}}
                 >
                   {i + 1}.
                 </span>
@@ -596,7 +596,7 @@ function PackageResultPage() {
         <div className="flex items-center gap-2 pl-1">
           <span
             className="px-2 py-0 text-xl font-bold border border-white"
-            style={{background: 'hsl(var(--accent))'}}
+            style={{background: 'hsl(var(--primary))'}}
           >
             {availablePlatforms.length} 平台
           </span>
@@ -638,7 +638,7 @@ function PackageResultPage() {
         <div className="px-4 pt-5">
           {/* 复制当前平台全文按钮 */}
           <div
-            className="flex items-center gap-2 justify-center border border-border rounded-xl py-3 mb-5 bg-card shadow-card"
+            className="flex items-center gap-2 justify-center border rounded-xl py-3 mb-5 btn-secondary"
             onClick={handleCopyAll}
           >
             <div className="i-mdi-content-copy text-2xl text-foreground" />
@@ -725,8 +725,8 @@ function PackageResultPage() {
         <div className="flex gap-3">
           <button
             type="button"
-            className="flex-1 border border-border rounded-xl flex items-center justify-center leading-none text-xl font-bold shadow-card"
-            style={{background: 'hsl(var(--card))', color: 'hsl(var(--foreground))', padding: 0}}
+            className="flex-1 border rounded-xl flex items-center justify-center leading-none text-xl font-bold btn-secondary"
+            style={{padding: 0}}
             onClick={handleCopyAllPlatforms}
           >
             <div className="py-4 flex items-center gap-2">
@@ -736,8 +736,8 @@ function PackageResultPage() {
           </button>
           <button
             type="button"
-            className="flex-1 border border-border rounded-xl flex items-center justify-center leading-none text-xl font-bold shadow-primary"
-            style={{background: saving ? 'hsl(var(--muted))' : 'hsl(var(--accent))', color: 'white', padding: 0}}
+            className={`flex-1 border rounded-xl flex items-center justify-center leading-none text-xl font-bold ${saving ? 'btn-disabled' : 'btn-primary'}`}
+            style={{padding: 0}}
             onClick={handleSaveToLibrary}
           >
             <div className="py-4 flex items-center gap-2">

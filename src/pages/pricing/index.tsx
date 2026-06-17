@@ -131,7 +131,7 @@ function PricingPage() {
       <div className="bg-gradient-hero px-5 pt-8 pb-6">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-3xl font-bold text-white">Luna 套餐</span>
-          <span className="px-2 py-0 bg-accent text-white text-xl font-bold border border-white">版本对比</span>
+          <span className="px-2 py-0 text-white text-xl font-bold border border-white" style={{background: 'rgba(255,255,255,0.18)'}}>版本对比</span>
         </div>
         <p className="text-xl" style={{color: 'rgba(255,255,255,0.6)'}}>素材包生成 · 图片生成 · 视频脚本生成</p>
       </div>
@@ -144,14 +144,17 @@ function PricingPage() {
           return (
             <div
               key={plan.id}
-              className="border border-border bg-card rounded-2xl overflow-hidden"
-              style={{boxShadow: isSelected ? 'var(--shadow-primary)' : 'var(--shadow-card)'}}
+              className="border bg-card rounded-2xl overflow-hidden"
+              style={{
+                borderColor: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))',
+                boxShadow: isSelected ? 'var(--shadow-primary)' : 'var(--shadow-card)',
+              }}
               onClick={() => setSelectedPlan(plan)}
             >
               {/* 套餐头部 */}
               <div
                 className="flex items-center justify-between px-4 py-4 border-b-2 border-border"
-                style={{background: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}
+                style={{background: isSelected ? 'var(--gradient-primary)' : 'hsl(var(--foreground))'}}
               >
                 <div className="flex items-center gap-3">
                   <div className={`${plan.icon} text-2xl text-white`} />
@@ -173,33 +176,33 @@ function PricingPage() {
                 <p className="text-xl text-foreground leading-relaxed mb-3">{plan.highlight}</p>
                 <div className="flex flex-col gap-2">
                   {/* 素材包次数 */}
-                  <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 bg-accent/5">
+                  <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2" style={{background: 'hsl(var(--primary) / 0.05)'}}>
                     <div className="flex items-center gap-2">
                       <div className="i-mdi-layers-outline text-xl text-foreground" />
                       <span className="text-xl text-foreground">素材包生成</span>
                     </div>
-                    <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
+                    <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}}>
                       {formatPlanQuota(plan.packageCount, '次')}
                     </span>
                   </div>
                   {/* 图片额度 */}
-                  <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 bg-accent/5">
+                  <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2" style={{background: 'hsl(var(--primary) / 0.05)'}}>
                     <div className="flex items-center gap-2">
                       <div className="i-mdi-image-outline text-xl text-foreground" />
                       <span className="text-xl text-foreground">图片生成</span>
                     </div>
-                    <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
+                    <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}}>
                       {formatPlanQuota(plan.imageCount, '张')}
                     </span>
                   </div>
                   {/* 视频额度（有的话显示） */}
                   {plan.videoSeconds && (
-                    <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2 bg-accent/5">
+                    <div className="flex items-center justify-between border border-border rounded-lg px-3 py-2" style={{background: 'hsl(var(--primary) / 0.05)'}}>
                       <div className="flex items-center gap-2">
                         <div className="i-mdi-video-outline text-xl text-foreground" />
                         <span className="text-xl text-foreground">视频脚本生成</span>
                       </div>
-                      <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--accent))' : 'hsl(var(--foreground))'}}>
+                      <span className="text-xl font-bold" style={{color: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}}>
                         {formatPlanQuota(plan.videoSeconds, '次')}
                       </span>
                     </div>
@@ -209,7 +212,7 @@ function PricingPage() {
 
               {/* 选中指示 */}
               {isSelected && (
-                <div className="border-t-2 border-border px-4 py-3 flex items-center gap-2" style={{background: 'hsl(var(--accent))'}}>
+                <div className="border-t-2 border-border px-4 py-3 flex items-center gap-2" style={{background: 'var(--gradient-primary)'}}>
                   <div className="i-mdi-check-circle text-xl text-white" />
                   <span className="text-xl font-bold text-white">已选择 {plan.name}</span>
                 </div>
@@ -225,7 +228,7 @@ function PricingPage() {
           <p className="text-xl text-foreground font-bold mb-2">所有版本均包含</p>
           {['AI 多平台内容生成', '小红书 / 抖音 / 视频号 / 公众号适配', '图片提示词与视频脚本生成', '7×12 小时在线客服'].map((item) => (
             <div key={item} className="flex items-center gap-2 mt-1">
-              <div className="i-mdi-check text-xl" style={{color: 'hsl(var(--accent))'}} />
+              <div className="i-mdi-check text-xl" style={{color: 'hsl(var(--primary))'}} />
               <span className="text-xl text-foreground">{item}</span>
             </div>
           ))}
@@ -237,8 +240,8 @@ function PricingPage() {
         {selectedPlan && selectedPlan.id !== 'free' ? (
           <button
             type="button"
-            className="w-full border border-border flex items-center justify-center leading-none text-2xl font-bold shadow-primary rounded-xl"
-            style={{background: paying ? 'hsl(var(--muted))' : 'hsl(var(--accent))', color: 'white', padding: 0}}
+            className={`w-full border flex items-center justify-center leading-none text-2xl font-bold rounded-xl ${paying ? 'btn-disabled' : 'btn-primary'}`}
+            style={{padding: 0}}
             onClick={handlePurchase}
           >
             <div className="py-4">

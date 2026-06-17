@@ -8,11 +8,11 @@ import {MEMBERSHIP_LABELS, PLANS} from '@/db/types'
 import type {Order} from '@/db/types'
 
 const STATUS_LABELS: Record<string, {label: string; color: string}> = {
-  pending: {label: '待支付', color: 'text-foreground bg-secondary border border-border'},
-  paid: {label: '已支付', color: 'text-foreground bg-secondary'},
-  completed: {label: '已完成', color: 'text-foreground bg-secondary border border-border'},
-  cancelled: {label: '已取消', color: 'text-muted-foreground bg-muted'},
-  refunded: {label: '已退款', color: 'text-destructive bg-destructive/10'}
+  pending: {label: '\u5f85\u652f\u4ed8', color: 'state-warning'},
+  paid: {label: '\u5df2\u652f\u4ed8', color: 'state-success'},
+  completed: {label: '\u5df2\u5b8c\u6210', color: 'state-success'},
+  cancelled: {label: '\u5df2\u53d6\u6d88', color: 'text-muted-foreground bg-muted border-border'},
+  refunded: {label: '\u5df2\u9000\u6b3e', color: 'text-destructive bg-destructive/10 border-destructive/20'}
 }
 
 function OrdersPage() {
@@ -63,7 +63,7 @@ function OrdersPage() {
           />
           <div className="relative">
             <div className="flex items-center gap-2 mb-3">
-              <div className="i-mdi-crown-outline text-accent" style={{fontSize: '22px'}} />
+              <div className="i-mdi-crown-outline text-white" style={{fontSize: '22px'}} />
               <span className="text-xl text-white/80">当前会员</span>
             </div>
             <div className="flex items-end gap-3 mb-3">
@@ -124,7 +124,7 @@ function OrdersPage() {
                       <p className="text-2xl font-bold text-foreground truncate">{order.plan_name}</p>
                       <p className="text-xl text-muted-foreground mt-1 truncate">订单号：{order.order_no}</p>
                     </div>
-                    <div className={`px-3 py-1 border ${statusInfo.color}`}>
+                    <div className={`px-3 py-1 border rounded-lg ${statusInfo.color}`}>
                       <span className="text-xl font-medium">{statusInfo.label}</span>
                     </div>
                   </div>

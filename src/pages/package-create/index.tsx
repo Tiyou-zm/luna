@@ -233,7 +233,7 @@ function PackageCreatePage() {
         {/* 目标平台 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
+            <div className="w-1 h-5" style={{background: 'hsl(var(--primary))'}} />
             <span className="text-2xl font-bold text-foreground">目标平台</span>
             <span className="text-xl text-muted-foreground">（可多选）</span>
           </div>
@@ -244,7 +244,7 @@ function PackageCreatePage() {
                 <div
                   key={p}
                   className="flex-1 border border-border rounded-lg flex items-center justify-center py-3"
-                  style={{background: selected ? 'hsl(var(--accent))' : 'hsl(var(--card))'}}
+                  style={{background: selected ? 'hsl(var(--primary))' : 'hsl(var(--card))'}}
                   onClick={() => togglePlatform(p)}
                 >
                   <span
@@ -262,7 +262,7 @@ function PackageCreatePage() {
         {/* 投放目标 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
+            <div className="w-1 h-5" style={{background: 'hsl(var(--primary))'}} />
             <span className="text-2xl font-bold text-foreground">投放目标</span>
           </div>
           <div className="border border-border bg-card shadow-card overflow-hidden">
@@ -285,7 +285,7 @@ function PackageCreatePage() {
           <>
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
+                <div className="w-1 h-5" style={{background: 'hsl(var(--primary))'}} />
                 <span className="text-2xl font-bold text-foreground">内容说明</span>
               </div>
               <div className="border border-border bg-card shadow-card overflow-hidden">
@@ -305,7 +305,7 @@ function PackageCreatePage() {
             {/* 上传文件 */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
+                <div className="w-1 h-5" style={{background: 'hsl(var(--primary))'}} />
                 <span className="text-2xl font-bold text-foreground">上传文件</span>
                 <span className="text-xl text-muted-foreground">（图片/视频，可选）</span>
               </div>
@@ -345,7 +345,7 @@ function PackageCreatePage() {
           <>
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-5" style={{background: 'hsl(var(--accent))'}} />
+                <div className="w-1 h-5" style={{background: 'hsl(var(--primary))'}} />
                 <span className="text-2xl font-bold text-foreground">行业方向</span>
               </div>
               <div className="border border-border bg-card shadow-card overflow-hidden">
@@ -374,7 +374,7 @@ function PackageCreatePage() {
                   <div
                     key={preset}
                     className="border border-border rounded-lg px-3 py-2"
-                    style={{background: selectedPreset === preset ? 'hsl(var(--accent))' : 'hsl(var(--card))'}}
+                    style={{background: selectedPreset === preset ? 'hsl(var(--primary))' : 'hsl(var(--card))'}}
                     onClick={() => handleSelectPreset(preset)}
                   >
                     <span
@@ -389,15 +389,15 @@ function PackageCreatePage() {
             </div>
 
             {/* 说明 */}
-            <div className="border border-border bg-accent rounded-xl px-4 py-4">
+            <div className="border border-primary/20 rounded-xl px-4 py-4" style={{background: 'hsl(var(--primary) / 0.08)'}}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="i-mdi-information-outline text-xl text-white" />
-                <span className="text-xl font-bold text-white">热点分析说明</span>
+                <div className="i-mdi-information-outline text-xl text-primary" />
+                <span className="text-xl font-bold text-primary">热点分析说明</span>
               </div>
-              <p className="text-xl leading-relaxed" style={{color: 'rgba(255,255,255,0.7)'}}>
+              <p className="text-xl leading-relaxed" style={{color: 'hsl(var(--foreground))'}}>
                 Luna 将基于该行业的公开信息和平台内容规律，分析当前热点方向，为您生成多平台内容方案。
               </p>
-              <p className="text-xl mt-2" style={{color: 'hsl(var(--accent))'}}>
+              <p className="text-xl mt-2" style={{color: 'hsl(var(--primary))'}}>
                 Luna 基于用户提供信息、公开信息和平台内容规律生成建议。
               </p>
             </div>
@@ -413,8 +413,8 @@ function PackageCreatePage() {
           type="button"
           className="w-full border border-border flex items-center justify-center leading-none text-2xl font-bold shadow-primary"
           style={{
-            background: generating ? 'hsl(var(--muted))' : 'hsl(var(--accent))',
-            color: 'white',
+            background: generating ? 'hsl(var(--muted))' : 'var(--gradient-primary)',
+            color: generating ? 'hsl(var(--muted-foreground))' : 'white',
             padding: 0,
           }}
           onClick={handleGenerate}
