@@ -23,7 +23,7 @@
 1. 用户在客服页输入文字或图片。
 2. 前端调用 `customerService` 云函数。
 3. 云函数写入一条用户消息到 `cs_messages`。
-4. 云函数调用 `CUSTOMER_SERVICE_*` 或兜底 `HERMES_*`。
+4. 云函数调用 `CUSTOMER_SERVICE_*`，未单独配置时可兜底 `MINIMAX_*`，不再兜底 Hermes。
 5. 云函数把 AI 回复写入 `cs_messages`。
 6. 前端通过 `getCsMessages` 拉取历史并展示。
 
@@ -56,9 +56,9 @@ flowchart TD
 建议只保留客服专用配置，不再兜底 Hermes：
 
 ```bash
-CUSTOMER_SERVICE_BASE_URL=https://your-cs-llm.example.com/v1/chat/completions
-CUSTOMER_SERVICE_API_KEY=你的客服模型 key
-CUSTOMER_SERVICE_MODEL=luna-customer-service
+CUSTOMER_SERVICE_BASE_URL=https://api.minimaxi.com/v1
+CUSTOMER_SERVICE_API_KEY=你的 Minimax 或客服模型 key
+CUSTOMER_SERVICE_MODEL=MiniMax-M2.7-highspeed
 CUSTOMER_SERVICE_TIMEOUT_MS=120000
 CUSTOMER_SERVICE_CONTEXT_GAP_MS=900000
 CUSTOMER_SERVICE_HISTORY_LIMIT=12
